@@ -58,10 +58,16 @@ class _28BYJ_48(object):
         self.wing_hole_center_to_center = 35
 
         # shaft
+        self.shaft_y_offset = 8
         self.body_to_shaft_base = 1.5
+        self.shaft_base_diameter = 9
+
         self.shaft_tip_to_body = 10
         self.shaft_tip_to_keyway_base = 6
-        self.shaft_keyway_base_to_shaft_base = self.shaft_tip_to_body - self.body_to_shaft_base - self.shaft_tip_to_keyway_base
+        self.shaft_base_to_keyway_base = self.shaft_tip_to_body - self.body_to_shaft_base - self.shaft_tip_to_keyway_base
+        self.keyway_base_diameter = 5
+
+        self.key_width = 3
 
         # create the part sections
         body = self.body()
@@ -69,7 +75,7 @@ class _28BYJ_48(object):
 
         mounting = self.mounting_wings()
         print 'Mounting wings DONE: {}'.format(mounting)
-        self.shaft()
+        shaft = self.shaft()
 
 
         self.final_name = self.get_next_name("COMPLETE.g")
@@ -77,7 +83,8 @@ class _28BYJ_48(object):
 
         brl_db.combination(self.final_name,
                            tree=union(body,
-                                      mounting),
+                                      mounting,
+                                      shaft),
         )
         print 'final motor DONE: {}'.format(self.final_name)
     
@@ -200,8 +207,45 @@ class _28BYJ_48(object):
         )
         """
 
-    def shaft(self):
-        pass
+    def shaft(self):    
+        shaft1 = self.get_next_name('body_to_shaft_base.s')
+        # create the motor body centered at x0,y0,z0
+        self.brl_db.rcc(shaft1,
+                   base=(0, self.shaft_y_offset, self.depth),
+                   height=(0, 0, self.body_to_shaft_base),
+                   radius=self.shaft_base_diameter/2.0)
+
+        shaft2 = self.get_next_name("shaft_base.s")
+        self.brl_db.rcc(shaft2,
+                        base=(0,  # x
+                              self.shaft_y_offset,                                     # y
+                              self.depth+self.body_to_shaft_base),     # z
+                        height=(0,                       # x
+                                0,   # y
+                                self.shaft_base_to_keyway_base),                           # z
+                        radius=self.shaft_base_diameter/2.0
+                        )
+
+        shaft3 = self.get_next_name("shaft_key_cyl.s")
+        self.brl_db.rcc(shaft2,
+                        base=(0,  # x
+                              self.shaft_y_offset,                                     # y
+                              self.depth + self.body_to_shaft_base + self.shaft_base_to_keyway_base),     # z
+                        height=(0,                       # x
+                                0,   # y
+                                self.shaft_base_to_keyway_base),                           # z
+                        radius=self.shaft_base_diameter/2.0
+                        )
+
+        # Make a region that is the union of these two objects. To accomplish
+        # this, we don't need anymore to create any linked list of the items ;-).
+        shaft = self.get_next_name("shaft.r")
+        self.brl_db.combination(shaft,
+                                tree=union(shaft1,
+                                           shaft2,
+                                           shaft3)
+        )
+        return shaft
 
     def wires(self):
         pass

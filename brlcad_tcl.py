@@ -64,3 +64,81 @@ class brlcad_tcl():
         is_string(name)
         self.script_string += 'r {} u {}\n'.format(name, tree[0].join(tree[1]))
 
+    def Arb4(self, name, arb4, v1, v2, v3, v4):
+        is_string(name)
+
+
+    def Arb5(self, name, arb5, v1, v2, v3, v4, v5):
+        is_string(name)
+
+
+    def Arb6(self, name, arb6, v1, v2, v3, v4, v5, v):
+        is_string(name)
+
+
+    def Arb7(self, name, arb7, v1, v2, v3, v4, v5, v6, v7):
+        is_string(name)
+
+
+    def Arb8(self, name, arb8, v1, v2, v3, v4, v5, v6, v7, v8):
+        is_string(name)
+
+
+    def Cone(self, name, trc, vertex, height_vector, base_radius, top_radius):
+        is_string(name)
+
+
+    def Cone_elliptical(self, name, tec, vertex, height_vector, major_axis, minor_axis, ratio):
+        is_string(name)
+
+
+    def Cone_general(self, name, tgc, vertex, height_vector, avector, bvector, cscalar, dscalar):
+        is_string(name)
+
+
+    def Cylinder(self, name, rcc, vertex, height_vector, radius):
+        is_string(name)
+
+
+    def Cylinder_elliptical(self, name, rec, vertex, height_vector, major_axis, minor_axis):
+        is_string(name)
+
+
+    def Cylinder_hyperbolic(self, name, rhc,vertex, height_vector, bvector, half_width, apex_to_asymptote):
+        is_string(name)
+
+
+    def Cylinder_parabolic(self, name, rpc, vertex, height_vector, bvector, half_width):
+        is_string(name)
+
+
+    def Ellipsoid(self, name, ell, vertex, avector, bvector, cvector):
+        is_string(name)
+
+    def Hyperboloid_elliptical(self, name, ehy, vertex, height_vector, avector, bscalar, apex_to_asymptote):
+        is_string(name)
+
+    def Paraboloid_elliptical(self, name, epa, vertex, height_vector, avector, bscalar):
+        is_string(name)
+
+
+    def Ellipsoid_radius(self, name, ell1, vertex, radius):
+        is_string(name)
+
+
+    def Particle(self, name, part, vertex, height_vector, radius_at_v_end, radius_at_h_end):
+        is_string(name)
+
+
+    def Sphere(self, name, sph, vertex, radius):
+        is_string(name)
+
+
+    def Torus(self, name, tor, vertex, normal, radius_1, radius_2):
+        is_string(name)
+
+
+    def Torus_elliptical(self, name, eto, vertex, normal_vector, radius, cvector, axis):
+        is_string(name)
+
+
