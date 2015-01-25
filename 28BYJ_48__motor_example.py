@@ -211,8 +211,12 @@ class _28BYJ_48(object):
         shaft1 = self.get_next_name('body_to_shaft_base.s')
         # create the motor body centered at x0,y0,z0
         self.brl_db.rcc(shaft1,
-                   base=(0, self.shaft_y_offset, self.depth),
-                   height=(0, 0, self.body_to_shaft_base),
+                   base=(0,
+                         self.shaft_y_offset,
+                         self.depth),
+                   height=(0,
+                           0,
+                           self.body_to_shaft_base),
                    radius=self.shaft_base_diameter/2.0)
 
         shaft2 = self.get_next_name("shaft_base.s")
@@ -223,7 +227,7 @@ class _28BYJ_48(object):
                         height=(0,                       # x
                                 0,   # y
                                 self.shaft_base_to_keyway_base),                           # z
-                        radius=self.shaft_base_diameter/2.0
+                        radius=self.keyway_base_diameter/2.0
                         )
 
         shaft3 = self.get_next_name("shaft_key_cyl.s")
