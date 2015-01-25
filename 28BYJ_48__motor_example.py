@@ -49,7 +49,7 @@ class _28BYJ_48(object):
         self.diameter=28
         self.depth=19
         self.wire_square_width = 14.6
-        self.wire_square_len_from_center = 17
+        self.wire_square_len_from_center = -17
 
         # mounting wings
         self.wing_thickness = 1
@@ -104,10 +104,10 @@ class _28BYJ_48(object):
         wire_square = self.get_next_name("wire_square.s")
         self.brl_db.rpp(wire_square,
                    pmin=(self.wire_square_width/-2.0,  # x
-                         0,                                     # y
+                         self.wire_square_len_from_center,                                     # y
                          0),     # z
                    pmax=(self.wire_square_width/2.0,                       # x
-                         self.wire_square_len_from_center,   # y
+                         0,   # y
                          self.depth)                            # z
                    )
         # Make a region that is the union of these two objects. To accomplish
@@ -230,16 +230,35 @@ class _28BYJ_48(object):
                         radius=self.keyway_base_diameter/2.0
                         )
 
+        key_start = self.depth + self.body_to_shaft_base + self.shaft_base_to_keyway_base
+        key_end = key_start + self.shaft_tip_to_keyway_base
+
         shaft3 = self.get_next_name("shaft_key_cyl.s")
-        self.brl_db.rcc(shaft2,
+        self.brl_db.rcc(shaft3,
                         base=(0,  # x
                               self.shaft_y_offset,                                     # y
-                              self.depth + self.body_to_shaft_base + self.shaft_base_to_keyway_base),     # z
+                              key_start),     # z
                         height=(0,                       # x
                                 0,   # y
-                                self.shaft_base_to_keyway_base),                           # z
-                        radius=self.shaft_base_diameter/2.0
+                                self.shaft_tip_to_keyway_base),                           # z
+                        radius=self.keyway_base_diameter/2.0
                         )
+        shaft4 = self.get_next_name("shaft_key_rpp.s")
+        self.brl_db.rpp(shaft4,
+                        pmin=(self.keyway_base_diameter/-2.0,  # x
+                              self.shaft_y_offset-(self.key_width/2.0),                                     # y
+                              key_start),     # z
+                        pmax=(self.keyway_base_diameter/2.0,                       # x
+                              self.shaft_y_offset+(self.key_width/2.0),   # y
+                              key_end)                           # z
+                        )
+        shaft_key = self.get_next_name("shaft_key.r")
+        self.brl_db.combination(shaft_key,
+                                tree=intersect(shaft3,
+                                               shaft4
+                                              )
+        )
+
 
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
@@ -247,7 +266,7 @@ class _28BYJ_48(object):
         self.brl_db.combination(shaft,
                                 tree=union(shaft1,
                                            shaft2,
-                                           shaft3)
+                                           shaft_key)
         )
         return shaft
 
