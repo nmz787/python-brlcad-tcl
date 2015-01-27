@@ -19,13 +19,13 @@ import sys
 #import brlcad.wdb as wdb
 
 from brlcad_tcl import *
-from brlcad_name_generator import brlcad_name_generator
+from brlcad_name_generator import BrlcadNameTracker
 
-
-class _28BYJ_48(object):
-    def __init__(self, brl_db, get_next_name_func):
+class _28BYJ_48():
+    def __init__(self, brl_db, name_tracker):
         self.brl_db = brl_db
-        self.get_next_name_func = get_next_name_func
+        self.name_tracker = name_tracker
+        self.get_next_name = self.name_tracker.get_next_name
 
         self.final_name = None
 
@@ -62,7 +62,7 @@ class _28BYJ_48(object):
         shaft = self.shaft()
 
 
-        self.final_name = self.get_next_name("COMPLETE.g")
+        self.final_name = self.get_next_name(self, "COMPLETE.g")
         print 'final motor name: {}'.format(self.final_name)
 
         brl_db.combination(self.final_name,
@@ -71,21 +71,17 @@ class _28BYJ_48(object):
                                       shaft),
         )
         print 'final motor DONE: {}'.format(self.final_name)
-    
-    def get_next_name(self, sub_component_part_name):
-        return self.get_next_name_func('_28BYJ_48' + '__' + sub_component_part_name)
-
 
     def body(self):
 
-        main_body_cyl = self.get_next_name('main_body_cyl.s')
+        main_body_cyl = self.get_next_name(self, 'main_body_cyl.s')
         # create the motor body centered at x0,y0,z0
         self.brl_db.rcc(main_body_cyl,
                    base=(0, 0, 0),
                    height=(0, 0, self.depth),
                    radius=self.diameter/2.0)
 
-        wire_square = self.get_next_name("wire_square.s")
+        wire_square = self.get_next_name(self, "wire_square.s")
         self.brl_db.rpp(wire_square,
                    pmin=(self.wire_square_width/-2.0,  # x
                          self.wire_square_len_from_center,                                     # y
@@ -96,7 +92,7 @@ class _28BYJ_48(object):
                    )
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
-        main_body = self.get_next_name("main_body.r")
+        main_body = self.get_next_name(self, "main_body.r")
         self.brl_db.combination(main_body,
                                 tree=union(wire_square,
                                            main_body_cyl)
@@ -107,7 +103,7 @@ class _28BYJ_48(object):
 
         # Make an rpp under the sphere (partly overlapping). Note that this really
         # makes an arb8, but gives us a shortcut for specifying the parameters.
-        wing_block_name = self.get_next_name("mounting_wings_rect.s")
+        wing_block_name = self.get_next_name(self, "mounting_wings_rect.s")
         self.brl_db.rpp(wing_block_name,
                    pmin=(self.wing_hole_center_to_center/-2.0,  # x
                          self.wing_width/-2.0,                                     # y
@@ -135,7 +131,7 @@ class _28BYJ_48(object):
                                                  'x':right_hole_x,
                                                  'r':self.screw_hole_diameter/2.0}}
         for item_name, item in curves_and_holes.iteritems():
-            item['brldb_name'] = self.get_next_name(item_name)
+            item['brldb_name'] = self.get_next_name(self, item_name)
             self.brl_db.rcc(item['brldb_name'],
                        base=(item['x'],
                              0,
@@ -149,7 +145,7 @@ class _28BYJ_48(object):
  
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
-        wings_block_chamfered = self.get_next_name("wings_chamfered.r")
+        wings_block_chamfered = self.get_next_name(self, "wings_chamfered.r")
         self.brl_db.combination(wings_block_chamfered,
                                 tree=union(curves_and_holes['left_wing_curve.s']['brldb_name'],
                                            curves_and_holes['right_wing_curve.s']['brldb_name'],
@@ -160,7 +156,7 @@ class _28BYJ_48(object):
         print '2 name: {}'.format(wings_block_chamfered)
 
         # now subtract the holes away
-        wings_block_left_hole_subtracted = self.get_next_name("wings_left_subtracted.r")
+        wings_block_left_hole_subtracted = self.get_next_name(self, "wings_left_subtracted.r")
         self.brl_db.combination(wings_block_left_hole_subtracted,
                            tree=subtract(wings_block_chamfered,
                                          curves_and_holes['left_wing_hole.s']['brldb_name'])
@@ -169,7 +165,7 @@ class _28BYJ_48(object):
 
         print '3 name: {}'.format(wings_block_left_hole_subtracted)
 
-        wings_block = self.get_next_name("wings_block.r")
+        wings_block = self.get_next_name(self, "wings_block.r")
         self.brl_db.combination(wings_block,
                            tree=subtract(wings_block_left_hole_subtracted,
                                          curves_and_holes['right_wing_hole.s']['brldb_name'])
@@ -192,7 +188,7 @@ class _28BYJ_48(object):
         """
 
     def shaft(self):    
-        shaft1 = self.get_next_name('body_to_shaft_base.s')
+        shaft1 = self.get_next_name(self, 'body_to_shaft_base.s')
         # create the motor body centered at x0,y0,z0
         self.brl_db.rcc(shaft1,
                    base=(0,
@@ -203,7 +199,7 @@ class _28BYJ_48(object):
                            self.body_to_shaft_base),
                    radius=self.shaft_base_diameter/2.0)
 
-        shaft2 = self.get_next_name("shaft_base.s")
+        shaft2 = self.get_next_name(self, "shaft_base.s")
         self.brl_db.rcc(shaft2,
                         base=(0,  # x
                               self.shaft_y_offset,                                     # y
@@ -217,7 +213,7 @@ class _28BYJ_48(object):
         key_start = self.depth + self.body_to_shaft_base + self.shaft_base_to_keyway_base
         key_end = key_start + self.shaft_tip_to_keyway_base
 
-        shaft3 = self.get_next_name("shaft_key_cyl.s")
+        shaft3 = self.get_next_name(self, "shaft_key_cyl.s")
         self.brl_db.rcc(shaft3,
                         base=(0,  # x
                               self.shaft_y_offset,                                     # y
@@ -227,7 +223,7 @@ class _28BYJ_48(object):
                                 self.shaft_tip_to_keyway_base),                           # z
                         radius=self.keyway_base_diameter/2.0
                         )
-        shaft4 = self.get_next_name("shaft_key_rpp.s")
+        shaft4 = self.get_next_name(self, "shaft_key_rpp.s")
         self.brl_db.rpp(shaft4,
                         pmin=(self.keyway_base_diameter/-2.0,  # x
                               self.shaft_y_offset-(self.key_width/2.0),                                     # y
@@ -236,7 +232,7 @@ class _28BYJ_48(object):
                               self.shaft_y_offset+(self.key_width/2.0),   # y
                               key_end)                           # z
                         )
-        shaft_key = self.get_next_name("shaft_key.r")
+        shaft_key = self.get_next_name(self, "shaft_key.r")
         self.brl_db.combination(shaft_key,
                                 tree=intersect(shaft3,
                                                shaft4
@@ -246,7 +242,7 @@ class _28BYJ_48(object):
 
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
-        shaft = self.get_next_name("shaft.r")
+        shaft = self.get_next_name(self, "shaft.r")
         self.brl_db.combination(shaft,
                                 tree=union(shaft1,
                                            shaft2,
@@ -262,8 +258,8 @@ class _28BYJ_48(object):
 def main(argv):
     #with wdb.WDB(argv[1], "My Database") as brl_db:
     with brlcad_tcl(argv[1], "My Database") as brl_db:
-        name_tracker = brlcad_name_generator()
-        motor = _28BYJ_48(brl_db, name_tracker.get_next_name)
+        name_tracker = BrlcadNameTracker()
+        motor = _28BYJ_48(brl_db, name_tracker)
         # All units in the database file are stored in millimeters. This constrains
         # the arguments to the mk_* routines to also be in millimeters.
 
