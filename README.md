@@ -14,7 +14,7 @@ So far this is a small subset of the brl-cad primitives with some notion of obje
 
 ## Multi-part example
 
-The multi-part example shows how to use two python objects. In addition to emitting the tcl script, it runs mged to create a new geometry database, and then converts that to an STL.
+The multi-part example shows how to use two python-brlcad-tcl objects (including `motor_28BYJ_48__example.py`). In addition to emitting the tcl script, it runs mged to create a new geometry database, and then converts that to an STL.
 
 To view the resulting (.g) file in `mged`:
 * `python multi_part_example.py multi_part.tcl && mged multi_part.g`
