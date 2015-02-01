@@ -7,6 +7,8 @@ class BrlcadNameTracker(object):
         self.num_parts_in_use_by_part_name = {}
 
     def get_next_name(self, requesting_object, part_name):
+        part_classname = requesting_object.__class__.__name__
+        part_name = '{}__{}'.format(part_classname, part_name)
         try:
             self.num_parts_in_use_by_part_name[part_name]+=1
         except KeyError:
@@ -14,5 +16,5 @@ class BrlcadNameTracker(object):
         name_split = part_name.split('.')
         name_prefix = '.'.join(name_split[:-1])
         name_suffix = '.'+name_split[-1] if len(name_split)>1 else ''
-        part_classname = requesting_object.__class__.__name__
-        return '{}__{}{}{}'.format(part_classname, name_prefix, self.num_parts_in_use_by_part_name[part_name], name_suffix)
+        
+        return '{}{}{}'.format(name_prefix, self.num_parts_in_use_by_part_name[part_name], name_suffix)

@@ -2,9 +2,9 @@
 A small example of a motor in python-brlcad syntax, but using python-brlcad-tcl as the backend.
 
 Run with:
-python 28BYJ_48__motor_example.py 28BYJ_48__motor_example.tcl
+python motor_28BYJ_48__example.py 28BYJ_48__motor_example.tcl
 mged 28BYJ_48__motor_example.g < 28BYJ_48__motor_example.tcl
-g-stl -o out.stl 28BYJ_48__motor_example.g _28BYJ_48__COMPLETE1.g
+g-stl -o out.stl 28BYJ_48__motor_example.g motor_28BYJ_48__COMPLETE1.g
 meshlab out.stl
 
 TODO:
@@ -21,13 +21,14 @@ import sys
 from brlcad_tcl import *
 from brlcad_name_tracker import BrlcadNameTracker
 
-class _28BYJ_48():
+class motor_28BYJ_48():
     def __init__(self, brl_db, name_tracker):
         self.brl_db = brl_db
         self.name_tracker = name_tracker
         self.get_next_name = self.name_tracker.get_next_name
 
         self.final_name = None
+        self.center_name = None
 
         # part properties
         self.diameter=28
@@ -62,13 +63,15 @@ class _28BYJ_48():
         shaft = self.shaft()
         print 'Shaft DONE: {}\n'.format(shaft)
 
-        self.final_name = self.get_next_name(self, "COMPLETE.g")
+        self.final_name = self.get_next_name(self, "COMPLETE.r")
 
-        brl_db.combination(self.final_name,
-                           tree=union(body,
-                                      mounting,
-                                      shaft),
-        )
+        # finally create a region (a special combination that means it's going to be rendered)
+        # by unioning together the main combinations we just created
+        brl_db.region(self.final_name,
+                      'u {} u {} u {}'.format(body,
+                                              mounting,
+                                              shaft)
+                      )
         print 'Motor COMPLETED AND COMBINED into part name: {}'.format(self.final_name)
 
     def body(self):
@@ -91,11 +94,16 @@ class _28BYJ_48():
                    )
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
-        main_body = self.get_next_name(self, "main_body.r")
+        main_body = self.get_next_name(self, "main_body.c")
         self.brl_db.combination(main_body,
-                                tree=union(wire_square,
-                                           main_body_cyl)
+                                'u {} u {}'.format(wire_square,
+                                                   main_body_cyl)
         )
+
+        # before returning, assemble the path to the center of the cylinder
+        # this seems like a reasonable point of rotation/translation
+        self.center_name = main_body + '/' + main_body_cyl
+
         return main_body
 
     def mounting_wings(self):
@@ -145,28 +153,28 @@ class _28BYJ_48():
  
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
-        wings_block_chamfered = self.get_next_name(self, "wings_chamfered.r")
+        wings_block_chamfered = self.get_next_name(self, "wings_chamfered.c")
         self.brl_db.combination(wings_block_chamfered,
-                                tree=union(curves_and_holes['left_wing_curve.s']['brldb_name'],
-                                           curves_and_holes['right_wing_curve.s']['brldb_name'],
-                                           wing_block_name)
+                                'u {} u {} u {}'.format(curves_and_holes['left_wing_curve.s']['brldb_name'],
+                                                        curves_and_holes['right_wing_curve.s']['brldb_name'],
+                                                        wing_block_name)
         )
         print 'Completed step 2 of wings, part name: {}'.format(wings_block_chamfered)
 
         # now subtract the holes away
-        wings_block_left_hole_subtracted = self.get_next_name(self, "wings_left_subtracted.r")
+        wings_block_left_hole_subtracted = self.get_next_name(self, "wings_left_subtracted.c")
         self.brl_db.combination(wings_block_left_hole_subtracted,
-                           tree=subtract(wings_block_chamfered,
-                                         curves_and_holes['left_wing_hole.s']['brldb_name'])
+                           'u {} - {}'.format(wings_block_chamfered,
+                                              curves_and_holes['left_wing_hole.s']['brldb_name'])
         )
 
 
         print 'Completed step 3 of wings, part name: {}'.format(wings_block_left_hole_subtracted)
 
-        wings_block = self.get_next_name(self, "wings_block.r")
+        wings_block = self.get_next_name(self, "wings_block.c")
         self.brl_db.combination(wings_block,
-                           tree=subtract(wings_block_left_hole_subtracted,
-                                         curves_and_holes['right_wing_hole.s']['brldb_name'])
+                           'u {} - {}'.format(wings_block_left_hole_subtracted,
+                                              curves_and_holes['right_wing_hole.s']['brldb_name'])
         )
         print 'Completed step 4 of wings, part name: {}'.format(wings_block)
         return wings_block
@@ -235,21 +243,21 @@ class _28BYJ_48():
                         )
         print 'Completed step 4 of shaft, part name: {}'.format(shaft4)
 
-        shaft_key = self.get_next_name(self, "shaft_key.r")
+        shaft_key = self.get_next_name(self, "shaft_key.c")
         self.brl_db.combination(shaft_key,
-                                tree=intersect(shaft3,
-                                               shaft4
-                                              )
+                                'u {} + {}'.format(shaft3,
+                                                   shaft4
+                                                 )
         )
         print 'Completed step 5 of shaft, part name: {}'.format(shaft_key)
 
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
-        shaft = self.get_next_name(self, "shaft.r")
+        shaft = self.get_next_name(self, "shaft.c")
         self.brl_db.combination(shaft,
-                                tree=union(shaft1,
-                                           shaft2,
-                                           shaft_key)
+                                'u {} u {} u {}'.format(shaft1,
+                                                        shaft2,
+                                                        shaft_key)
         )
         return shaft
 
@@ -262,7 +270,7 @@ def main(argv):
     #with wdb.WDB(argv[1], "My Database") as brl_db:
     with brlcad_tcl(argv[1], "My Database") as brl_db:
         name_tracker = BrlcadNameTracker()
-        motor = _28BYJ_48(brl_db, name_tracker)
+        motor = motor_28BYJ_48(brl_db, name_tracker)
         # All units in the database file are stored in millimeters. This constrains
         # the arguments to the mk_* routines to also be in millimeters.
 
