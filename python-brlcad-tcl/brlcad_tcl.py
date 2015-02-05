@@ -32,10 +32,11 @@ class brlcad_tcl():
     def __init__(self, tcl_filepath, title, make_g=False, make_stl=False, stl_quality=None):
         #if not os.path.isfile(self.output_filepath):
         #    abs_path = os.path.abspath(self.output_filepath)
-        #    if not 
+        #    if not
         self.make_stl = make_stl
         self.make_g = make_g
         self.tcl_filepath = tcl_filepath
+        self.stl_quality = stl_quality
         self.now_path = os.path.splitext(self.tcl_filepath)[0]
 
         self.script_string = 'title {}\nunits mm\n'.format(title)
@@ -66,7 +67,16 @@ class brlcad_tcl():
     def save_stl(self, objects_to_render):
         stl_path = self.now_path + '.stl'
         obj_str = ' '.join(objects_to_render)
-        cmd = 'g-stl -o {} {} {}'.format(stl_path, self.g_path, obj_str)
+        cmd = 'g-stl -o {}'.format(stl_path)
+
+        #Add the quality
+        if self.quality and self.stl_quality > 0:
+            cmd = '{} -a {}'.format(cmd, self.stl_quality)
+
+        #Add the paths
+        cmd = '{} {} {}'.format(cmd, self.g_path, obj_str)
+
+        print cmd
         proc = subprocess.Popen(cmd, shell=True)
         proc.communicate()
 
