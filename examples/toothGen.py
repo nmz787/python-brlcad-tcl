@@ -14,11 +14,13 @@ scriptPath = os.path.dirname(__file__)
 outFilePath = scriptPath + r'/output/toothGen.tcl'
 
 #Some variables for creating the gear teeth
+_defaultGearName = 'allTeeth'
+_defaultToothName = 'tooth'
 _toothHalfWidth = 0.27
 _toothDepth = 0.54
 _toothHeight = 0.25 - 0.0625
 
-def createGears(toFile = False, toothHalfWidth = _toothHalfWidth, toothDepth = _toothDepth, toothHeight = _toothHeight):
+def createGears(gearName = _defaultGearName, toFile = False, toothHalfWidth = _toothHalfWidth, toothDepth = _toothDepth, toothHeight = _toothHeight, toothBaseName = _defaultToothName):
 
     make1 = "in tooth0 arb6 " + str(-toothHalfWidth) + " 0 0 " \
     						+ str(toothHalfWidth) 	+ " 0 0 " \
@@ -27,7 +29,7 @@ def createGears(toFile = False, toothHalfWidth = _toothHalfWidth, toothDepth = _
     						+ "0 " + str(toothDepth) + " 0 " \
     						+ "0 " + str(toothDepth) + " " + str(toothHeight)
 
-    union = 'r allTeeth u tooth0 u '
+    union = 'r ' + str(gearName) + ' u ' + str(toothBaseName) +'0 u '
 
     numTeethAdditional = 24.0
     degPerTooth = 360/ (numTeethAdditional + 1)
@@ -39,11 +41,11 @@ def createGears(toFile = False, toothHalfWidth = _toothHalfWidth, toothDepth = _
     lines.append(endl)
 
     for tooth in range(int(numTeethAdditional)):
-    	tName = 'tooth' + str(tooth + 1)
+    	tName = str(toothBaseName) + str(tooth + 1)
     	if tooth == 0:
-    		prevTooth = 'tooth0'
+    		prevTooth = str(toothBaseName) + '0'
     	else:
-    		prevTooth = 'tooth' + str(tooth)
+    		prevTooth = toothBaseName + str(tooth)
     		union += 'u '
 
     	lines.append('cp ' + str(prevTooth) + spc + str(tName))
@@ -64,7 +66,7 @@ def createGears(toFile = False, toothHalfWidth = _toothHalfWidth, toothDepth = _
     	   outFile.write(endl.join(lines))
 
     #Give the lines
-    return lines, 'allTeeth'
+    return lines, gearName
 
 if __name__ == '__main__':
     createGears(True)
