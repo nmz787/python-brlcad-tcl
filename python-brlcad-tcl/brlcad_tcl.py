@@ -19,17 +19,16 @@ def is_string(name):
     assert(isinstance(name, str))
 
 def union(*args):
-    return [' u ', args]
-    #return [' ', args]
+    return ' u {}'.format(' u '.join(args))
 
 def subtract(*args):
-    return [' - ', args]
+    return ' u {}'.format(' - '.join(args))
 
 def intersect(*args):
-    return [' + ', args]
+    return ' u {}'.format(' + '.join(args))
 
 class brlcad_tcl():
-    def __init__(self, tcl_filepath, title, make_g=False, make_stl=False, stl_quality=None):
+    def __init__(self, tcl_filepath, title, make_g=False, make_stl=False, stl_quality=None, units = 'mm'):
         #if not os.path.isfile(self.output_filepath):
         #    abs_path = os.path.abspath(self.output_filepath)
         #    if not
@@ -39,7 +38,7 @@ class brlcad_tcl():
         self.stl_quality = stl_quality
         self.now_path = os.path.splitext(self.tcl_filepath)[0]
 
-        self.script_string = 'title {}\nunits mm\n'.format(title)
+        self.script_string = 'title {}\nunits {}\n'.format(title, units)
 
     def __enter__(self):
         return self
@@ -51,6 +50,10 @@ class brlcad_tcl():
             self.save_g()
         if self.make_stl:
             self.save_stl()
+            
+    def add_script_string(self, to_add):
+        #In case the user does some adding on their own
+        self.script_string += '\n' + str(to_add) + '\n'
 
     def save_tcl(self):
         with open(self.tcl_filepath, 'w') as f:
@@ -59,10 +62,16 @@ class brlcad_tcl():
     def save_g(self):
         self.g_path = self.now_path + '.g'
         # try to remove a databse file of the same name if it exists
-        proc = subprocess.Popen('rm {}'.format(self.g_path), shell=True)
-        proc.communicate()
+        os.remove(self.g_path)
+		
         proc = subprocess.Popen('mged {} < {}'.format(self.g_path, self.tcl_filepath), shell=True)
         proc.communicate()
+        
+    def run_and_save_stl(self, objects_to_render):
+        #Do all of them in one go
+        self.save_tcl()
+        self.save_g()
+        self.save_stl(objects_to_render)
 
     def save_stl(self, objects_to_render):
         stl_path = self.now_path + '.stl'
@@ -159,32 +168,43 @@ class brlcad_tcl():
                                                                      miny,maxy,
                                                                      minz,maxz)
 
-    def Arb4(self, name, arb4, v1, v2, v3, v4):
+    def arb4(self, name, v1, v2, v3, v4):
         is_string(name)
 
 
-    def Arb5(self, name, arb5, v1, v2, v3, v4, v5):
+    def arb5(self, name, v1, v2, v3, v4, v5):
         is_string(name)
 
 
-    def Arb6(self, name, arb6, v1, v2, v3, v4, v5, v):
+    def arb6(self, name, v1, v2, v3, v4, v5, v6):
         is_string(name)
 
 
-    def Arb7(self, name, arb7, v1, v2, v3, v4, v5, v6, v7):
+    def arb7(self, name, v1, v2, v3, v4, v5, v6, v7):
         is_string(name)
-
 
     def arb8(self, name, points):
         is_string(name)
         check_args = [is_truple(x) for x in points]
         assert(len(points)==8)
         points_list =  ' '.join([str(c) for c in chain.from_iterable(points)])
-        print 'arb8 points list: {}\n\n{}'.format(points, points_list)
+        
+        #print 'arb8 points list: {}\n\n{}'.format(points, points_list)
+        
         self.script_string += 'in {} arb8 {} \n'.format(name,
                                                         points_list
                                                         )
 
+                                                        
+    def arbX(self, name, vList):
+        #Detect which function to use, and feed in the parameters
+        if len(vList) in range(4, 9):
+            arbFunction = getattr(self, "arb" + str(len(vList)))
+            
+            #Execute it
+            arbFunction(name, *vList)
+        
+        
     def Cone(self, name, trc, vertex, height_vector, base_radius, top_radius):
         is_string(name)
 
