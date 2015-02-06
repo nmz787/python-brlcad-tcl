@@ -14,10 +14,9 @@ add toroid or revolved wegde-shape lip so the lid can click into an aerosol-type
 
 # sys has argv
 import sys
+import os
 
-#from brlcad.primitives import union, subtract
-#import brlcad.wdb as wdb
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
 from brlcad_tcl import *
 from brlcad_name_tracker import BrlcadNameTracker
 

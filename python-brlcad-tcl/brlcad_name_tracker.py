@@ -9,9 +9,13 @@ class BrlcadNameTracker(object):
     def get_next_name(self, requesting_object, part_name):
         part_classname = requesting_object.__class__.__name__
         part_name = '{}__{}'.format(part_classname, part_name)
+        # get the next instance number for the requested part 
+        # TODO: should there be a remove part method, which decrements the key's value?
+        # you can remove objects from the brlcad geometry database...
         try:
             self.num_parts_in_use_by_part_name[part_name]+=1
         except KeyError:
+            # if the key wasn't yet requested, start counting now
             self.num_parts_in_use_by_part_name[part_name]=1
         name_split = part_name.split('.')
         name_prefix = '.'.join(name_split[:-1])

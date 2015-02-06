@@ -70,7 +70,21 @@ class brlcad_tcl():
         cmd = 'g-stl -o {}'.format(stl_path)
 
         #Add the quality
-        if self.quality and self.stl_quality > 0:
+        """   from http://sourceforge.net/p/brlcad/support-requests/14/#0ced
+        The "-a" option specifies an absolute tessellation tolerance
+        - the maximum allowed distance (mm) between the real surface
+        and the facets
+        The "-r" option specifies a relative tessellation tolerance
+        - an absolute tolerance is calculated as the relative
+        tolerance times the "size" of the object being tessellated
+        (for a sphere, the "size" is the radius).
+        The "-n" option specifies the maximum surface normal error
+        (in radians).
+        By default, tessellations are performed using a relative
+        tolerance of 0.01. Try using the -r option with values other
+        than 0.01.
+        """
+        if self.stl_quality and self.stl_quality > 0:
             cmd = '{} -a {}'.format(cmd, self.stl_quality)
 
         #Add the paths
