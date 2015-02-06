@@ -84,6 +84,13 @@ class brlcad_tcl():
         tolerance of 0.01. Try using the -r option with values other
         than 0.01.
         """
+        """  from http://permalink.gmane.org/gmane.comp.cad.brlcad.devel/4600
+        For example, setting g-stl -n 1.0 should create a polygon for every 1-degree difference in curvature. 
+        Since your model has a lot of circular edges, this should me a considerable visual improvement.  Setting
+        the absolute tolerance to some sub-zero value should have a similar effect, but be careful to not specify a
+        number too small or you may inadvertently create many GB of polygons (or worse).
+        """
+
         if self.stl_quality and self.stl_quality > 0:
             cmd = '{} -a {}'.format(cmd, self.stl_quality)
 
