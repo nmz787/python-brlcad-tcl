@@ -17,7 +17,7 @@ outFileTCL = outFilePathBase + '.tcl'
 outFileSTL = outFilePathBase + '.stl'
 
 #The quality for the STL output. 0.5 is worse, 0.1 is pretty good, 0.01 makes files large but really good quality...
-stlQuality = 0.5
+stlQuality = 0.001
 
 #Some variables for creating all of the various components
 
@@ -27,7 +27,7 @@ def createPencilSharpener():
 	#Also we're working in Inches
 	brl = brlcad_tcl(tcl_filepath = outFileTCL, title = "Pencil Sharpener Gear", make_g = False, make_stl = True, stl_quality = stlQuality, units = 'in')
 	
-	#Create our cylinders...
+	#Create our cylinders, regions, names, etc...
 	bottom 			= 'b'
 	bottomNegative 	= 'bn'
 	bottomRing		= 'br'
@@ -59,27 +59,27 @@ def createPencilSharpener():
 	allFinal		= 'finished'
 
 	#Variables for their sizes and positions, in inches
-	bottomOuterRadius	= 0.625
-	bottomInnerRadius	= 0.4375
-	bottomHeight 		= 0.25
+	bottomOuterRadius	= 0.650
+	bottomInnerRadius	= 0.460
+	bottomHeight 		= 0.262
 	bottomPosition		= (0, 0, 0)
 	
-	middleOuterRadius	= 0.50
-	middleInnerRadius	= 0.4375
-	middleHeight		= 0.25
+	middleOuterRadius	= 0.502
+	middleInnerRadius	= 0.4575
+	middleHeight		= 0.275
 	middlePosition		= (0, 0, bottomHeight)	#Placed right on top of the bottom one
 	
 	topOuterRadius		= 0.49/2	#Measured diameter with Callipers
 	topInnerRadius		= 0.39/2	#Measured diameter with Callipers
-	topHeight			= 0.50
+	topHeight			= 0.383
 	topPosition			= (0, 0, bottomHeight + middleHeight)
 	
-	middleTopOuterRadius	= middleOuterRadius	#This acts as the top for the middle, since it is too thin
-	middleTopInnerRadius	= topInnerRadius	#This is the hole that goes through the top, so the bushel can go through
-	middleTopHeight			= -0.0625			#Negative because we're going from the top downward
+	middleTopOuterRadius	= middleOuterRadius		#This acts as the top for the middle, since it is too thin
+	middleTopInnerRadius	= topInnerRadius		#This is the hole that goes through the top, so the bushel can go through
+	middleTopHeight			= -middleHeight*0.25	#Negative because we're going from the top downward
 	middleTopPosition		= (0, 0, bottomHeight + middleHeight)
 	
-	leftGuideOuterRadius	= 0.11	#GET BETTER MEASUREMENT?!?
+	leftGuideOuterRadius	= 0.0625	#GET BETTER MEASUREMENT?!?
 	rightGuideOuterRadius	= leftGuideOuterRadius
 	leftGuideHeight			= topHeight/2 #ALSO GET BETTER
 	rightGuideHeight		= leftGuideHeight
@@ -91,9 +91,9 @@ def createPencilSharpener():
 	holeWidth		= holeWidthFull/2
 	holeHeightFull	= middleHeight
 	holeHeight		= holeHeightFull/2
-	holeDepthFull	= 0.5
+	holeDepthFull	= middleOuterRadius
 	
-	holeCenterHeight = 0.375
+	holeCenterHeight = bottomHeight + (middleHeight/2)
 	
 	#Create the 8 points that make the box
 	holePoints	= (
