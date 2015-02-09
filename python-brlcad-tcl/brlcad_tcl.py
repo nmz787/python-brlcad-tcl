@@ -110,6 +110,10 @@ class brlcad_tcl():
         proc = subprocess.Popen(cmd, shell=True)
         proc.communicate()
 
+    def set_combination_color(self, obj_name, R, G, B):
+        is_string(obj_name)
+        self.script_string += 'comb_color {} {} {} {}'.format(obj_name, R, G, B)
+
     def combination(self, name, operation):
         is_string(name)
         self.script_string += 'comb {} {}\n'.format(name, operation)
