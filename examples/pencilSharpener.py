@@ -70,7 +70,7 @@ def createPencilSharpener():
 	middlePosition		= (0, 0, bottomHeight)	#Placed right on top of the bottom one
 	
 	topOuterRadius		= 0.49/2	#Measured diameter with Callipers
-	topInnerRadius		= 0.39/2	#Measured diameter with Callipers
+	topInnerRadius		= 0.3937/2	#Measured diameter with Callipers
 	topHeight			= 0.383
 	topPosition			= (0, 0, bottomHeight + middleHeight)
 	
@@ -83,7 +83,8 @@ def createPencilSharpener():
 	rightGuideOuterRadius	= leftGuideOuterRadius
 	leftGuideHeight			= topHeight/2 #ALSO GET BETTER
 	rightGuideHeight		= leftGuideHeight
-	leftGuidePosition		= (middleOuterRadius - leftGuideOuterRadius, 0, bottomHeight + middleHeight)
+	leftGuideYOffset			= -leftGuideOuterRadius/2 #Apparently they are offset a little.
+	leftGuidePosition		= (middleOuterRadius - leftGuideOuterRadius, leftGuideYOffset, bottomHeight + middleHeight)
 	rightGuidePosition		= (-leftGuidePosition[0], leftGuidePosition[1], leftGuidePosition[2]) #Put it on the other side
 	
 	#Now we need the box that'll make our pencil shavings hole
@@ -103,7 +104,7 @@ def createPencilSharpener():
 					(-holeWidth	, 0	, holeCenterHeight + holeHeight),
 					
 					(-holeWidth	, holeDepthFull	, holeCenterHeight - holeHeight),
-						(holeWidth	, holeDepthFull	, holeCenterHeight - holeHeight),
+					(holeWidth	, holeDepthFull	, holeCenterHeight - holeHeight),
 					(holeWidth	, holeDepthFull	, holeCenterHeight + holeHeight),
 					(-holeWidth	, holeDepthFull	, holeCenterHeight + holeHeight),
 				)
