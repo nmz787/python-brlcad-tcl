@@ -3,6 +3,7 @@ from itertools import chain
 import datetime
 import subprocess
 import os
+from collections import OrderedDict
 
 def is_truple(arg):
     is_numeric_truple = isinstance(arg, tuple) and all([isinstance(x, numbers.Number) for x in arg])
@@ -62,7 +63,10 @@ class brlcad_tcl():
     def save_g(self):
         self.g_path = self.now_path + '.g'
         # try to remove a databse file of the same name if it exists
-        os.remove(self.g_path)
+        try:
+            os.remove(self.g_path)
+        except:
+            pass
 		
         proc = subprocess.Popen('mged {} < {}'.format(self.g_path, self.tcl_filepath), shell=True)
         proc.communicate()
@@ -267,3 +271,24 @@ class brlcad_tcl():
         is_string(name)
 
 
+    def pipe_point(self, x, y, z, inner_diameter, outer_diameter, bend_radius):
+        return OrderedDict(
+                           [('x', x),
+                            ('y', y),
+                            ('z', z),
+                            ('inner_diameter', inner_diameter),
+                            ('outer_diameter', outer_diameter),
+                            ('bend_radius', bend_radius)
+                           ]
+                          )
+
+    def pipe(self, name, pipe_points):
+        is_string(name)
+        num_points = len(pipe_points)
+        assert(num_points>1)
+        points_str_list = ['{} {} {} {} {} {}'.format(*points.values()) for points in pipe_points]
+        self.script_string += 'in {} pipe {} {}\n'.format(name, num_points, ' '.join(points_str_list) )
+        """ # this worked for me as a spring
+        in spring.s pipe 10 -500 -500 250 10 200 500 -500 500 350 100 200 500 500 500 450 100 200 500 500 -500 550 100 200 500 -500 -500 650 100 200 500 -500 500 750 100 200 500 500 500 850 100 200 500 500 -500 950 100 200 500 -500 -500 1050 100 200 500 -500 500 1150 100 200 500 0 500 1200 100 200 500
+        r s.r u spring.s
+        """
