@@ -14,7 +14,6 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
 from brlcad_tcl import *
-from brlcad_name_tracker import BrlcadNameTracker
 from vmath.vector import Vector
 
 
