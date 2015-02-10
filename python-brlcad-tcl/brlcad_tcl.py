@@ -3,7 +3,9 @@ from itertools import chain
 import datetime
 import subprocess
 import os
-from collections import OrderedDict
+from collections import OrderedDict, deque
+
+import vmath
 
 def is_truple(arg):
     is_numeric_truple = isinstance(arg, tuple) and all([isinstance(x, numbers.Number) for x in arg])
@@ -286,7 +288,13 @@ class brlcad_tcl():
         is_string(name)
         num_points = len(pipe_points)
         assert(num_points>1)
-        points_str_list = ['{} {} {} {} {} {}'.format(*points.values()) for points in pipe_points]
+
+        if isinstance(pipe_points[0], dict):
+            points_str_list = ['{} {} {} {} {} {}'.format(*points.values()) for points in pipe_points]
+        # handle the way the hilbert_3d example from python-brlcad was using the Vector class
+        elif isinstance(pipe_points[0][0], vmath.vector.Vector):
+            def rotate_tuple(x): d = deque(list(x)); d.rotate(2); return d
+            points_str_list = ['{} {} {} {} {} {}'.format(*(list(points[0]) + list(rotate_tuple(points[1:]))) ) for points in pipe_points]
         self.script_string += 'in {} pipe {} {}\n'.format(name, num_points, ' '.join(points_str_list) )
         """ # this worked for me as a spring
         in spring.s pipe 10 -500 -500 250 10 200 500 -500 500 350 100 200 500 500 500 450 100 200 500 500 -500 550 100 200 500 -500 -500 650 100 200 500 -500 500 750 100 200 500 500 500 850 100 200 500 500 -500 950 100 200 500 -500 -500 1050 100 200 500 -500 500 1150 100 200 500 0 500 1200 100 200 500

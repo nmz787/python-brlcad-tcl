@@ -22,7 +22,7 @@ def main(argv):
         
         
         # create a lookup table for 4 X,Y points on the spring circumference
-        spring_outline_x_y_tuples = [(-500,-500), (-500,500), (500,500), (500,-500)]
+        spring_outline_x_y_tuples = [(-50,-50), (-50,50), (50,50), (50,-50)]
         # create points, using the 10 for the z-step between points on the circumference.
         # the number of circumference points (4) times the z-step (10) yields 40, which is used to mod the z-value
         # this gets a series of 0,1,2,3 repeating, which is used as an index to the circumference X,Y values list
@@ -37,7 +37,7 @@ def main(argv):
                                       z=z,
                                       inner_diameter=2,
                                       outer_diameter=5,
-                                      bend_radius=500)
+                                      bend_radius=50)
             points.append(point)
         brl_db.pipe('spring1.s', points)
         brl_db.region('spring.r', 'u spring1.s')
