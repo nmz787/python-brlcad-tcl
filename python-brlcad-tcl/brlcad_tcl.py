@@ -167,6 +167,9 @@ class brlcad_tcl():
                                                                      hx,hy,hz,
                                                                      radius)
 
+    def circular_cylinder(self, name, base_center_point, top_center_point, radius):
+        self.rcc(name, base_center_point, top_center_point, radius)
+
     def rpp(self, name, pmin, pmax):
         is_string(name)
         is_truple(pmin)
@@ -178,17 +181,17 @@ class brlcad_tcl():
                                                                      miny,maxy,
                                                                      minz,maxz)
 
+    def cuboid(self, name, corner_point, opposing_corner_point):
+        self.rpp(name, corner_point, opposing_corner_point)
+
     def arb4(self, name, v1, v2, v3, v4):
         is_string(name)
-
 
     def arb5(self, name, v1, v2, v3, v4, v5):
         is_string(name)
 
-
     def arb6(self, name, v1, v2, v3, v4, v5, v6):
         is_string(name)
-
 
     def arb7(self, name, v1, v2, v3, v4, v5, v6, v7):
         is_string(name)
@@ -227,21 +230,17 @@ class brlcad_tcl():
         is_string(name)
 
 
-    def Cylinder(self, name, rcc, vertex, height_vector, radius):
-        is_string(name)
-
+    def Cylinder(self, name, vertex, height_vector, radius):
+        self.rcc(name, vertex, height_vector, radius)
 
     def Cylinder_elliptical(self, name, rec, vertex, height_vector, major_axis, minor_axis):
         is_string(name)
 
-
     def Cylinder_hyperbolic(self, name, rhc,vertex, height_vector, bvector, half_width, apex_to_asymptote):
         is_string(name)
 
-
     def Cylinder_parabolic(self, name, rpc, vertex, height_vector, bvector, half_width):
         is_string(name)
-
 
     def Ellipsoid(self, name, ell, vertex, avector, bvector, cvector):
         is_string(name)
