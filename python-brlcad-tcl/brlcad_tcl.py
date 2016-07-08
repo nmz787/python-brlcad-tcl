@@ -8,7 +8,7 @@ from collections import OrderedDict, deque
 import vmath
 
 def is_truple(arg):
-    is_numeric_truple = isinstance(arg, tuple) and all([isinstance(x, numbers.Number) for x in arg])
+    is_numeric_truple = (isinstance(arg, tuple) or isinstance(arg, list)) and all([isinstance(x, numbers.Number) for x in arg])
     assert(is_numeric_truple)
 
 def is_number(arg):
@@ -299,3 +299,11 @@ class brlcad_tcl():
         in spring.s pipe 10 -500 -500 250 10 200 500 -500 500 350 100 200 500 500 500 450 100 200 500 500 -500 550 100 200 500 -500 -500 650 100 200 500 -500 500 750 100 200 500 500 500 850 100 200 500 500 -500 950 100 200 500 -500 -500 1050 100 200 500 -500 500 1150 100 200 500 0 500 1200 100 200 500
         r s.r u spring.s
         """
+
+
+class BrlCadModel(object):
+    def __init__(self, brl_db, name_tracker):
+        self.brl_db = brl_db
+        self.name_tracker = name_tracker
+        self.get_next_name = self.name_tracker.get_next_name
+        self.final_name = None
