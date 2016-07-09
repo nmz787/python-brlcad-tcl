@@ -125,13 +125,27 @@ def main(argv):
                               'fo.s')
                       )
 
+
+        
+
         # All units in the database file are stored in millimeters. This constrains
         # the arguments to the mk_* routines to also be in millimeters.
     # process the tcl script into a g database by calling mged
     brl_db.save_g()
+    orig_path = brl_db.now_path
+    slice_coords = brl_db.export_slices(300, 30000,30000)
+    
+    for i, sc in enumerate(slice_coords):
+      brl_db.now_path = orig_path + str(i)
+      if i==0:
+        brl_db.run_and_save_stl(['slice{}.r'.format(i)])
+      else:
+        brl_db.save_stl(['slice{}.r'.format(i)])
+    
+    brl_db.now_path = orig_path
     # process the g database into an STL file with a list of regions
     brl_db.save_stl([final_name])#, aerosol_can_cap.final_name])
-
+    
 
 if __name__ == "__main__":
     main(sys.argv)

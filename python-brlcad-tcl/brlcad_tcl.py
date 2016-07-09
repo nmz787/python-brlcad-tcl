@@ -1,6 +1,5 @@
 import os
 import numbers
-from itertools import chain
 import datetime
 import subprocess
 from itertools import chain
@@ -151,7 +150,130 @@ class brlcad_tcl():
         proc = subprocess.Popen(cmd, shell=True)
         proc.communicate()
 
-    
+    def export_slices(self, slice_thickness, max_slice_x, max_slice_y, output_format=''):
+        tl_names = self.get_top_level_object_names()
+        xyz1, xyz2 = self.get_opposing_corners_bounding_box(self.get_bounding_box_coords_for_entire_db(tl_names))
+        print 'bb of all items {} to {}'.format(xyz1, xyz2)
+
+        if abs(xyz1[0] - xyz2[0]) > max_slice_x:
+            raise Exception('x dimension exceeds buildable bounds')
+        if abs(xyz1[1] - xyz2[1]) > max_slice_y:
+            raise Exception('y dimension exceeds buildable bounds')
+
+        slice_coords = list(self.get_object_slice_coords(slice_thickness, xyz1, xyz2))
+
+        for i, object_slice_bb_coords in enumerate(slice_coords):
+            print 'slice_bb{}.s'.format(i)
+            self.cuboid('slice_bb{}.s'.format(i), object_slice_bb_coords[0], object_slice_bb_coords[1])
+            # finally create a region (a special combination that means it's going to be rendered)
+            # by unioning together the main combinations we just created
+            tl_name_plussed = ' + '.join(tl_names)
+            slice_reg_name = 'slice{}.r'.format(i)
+            self.region(slice_reg_name,
+                          'u slice_bb{}.s + {}'.format(i, tl_name_plussed)
+                          )
+        return slice_coords
+            # save_object_image_from_z_projection(object_slice, output_format)
+
+    def get_object_slice_coords(self, slice_thickness, xyz1, xyz2):
+        # num_slices = abs(xy1[2] - xy2[2]) / slice_thickeness
+        lz = min(xyz1[2], xyz2[2])
+        mz = max(xyz1[2], xyz2[2])
+        iz = lz
+        while iz < mz:
+            c1 = [c for c in xyz1]
+            c1[2] = iz
+            c2 = [c for c in xyz2]
+            iz += slice_thickness
+            if iz>mz:
+                iz=mz
+            c2[2] = iz
+            for i in range(3):
+                if c1[i]>c2[i]:
+                    g = c1[i]
+                    c1[i] = c2[i]
+                    c2[i] = g
+            yield (c1, c2)
+        #direction
+        #for  in range():
+
+    def get_top_level_object_names(self):
+        """
+        The "tops" command displays a list of all the top-level objects in the current database.
+        The top-level objects are all those objects that are not referenced by some other combination.
+        The hierarchical structure of BRL-CAD databases usually means that there will be a top-level 
+        object that includes all (or at least most) of the objects in the database.
+        The -g option shows only geometry objects. The -n option specifies that no "decoration" 
+        (e.g., "/" and "/R") be shown at the end of each object name. 
+        The -u option will not show hidden objects. See also the hide command.
+        """
+        proc = subprocess.Popen('mged {} "tops"'.format(self.g_path),
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                shell=True)
+        (stdoutdata, stderrdata) = proc.communicate()
+        print stdoutdata
+        print stderrdata
+        flattened = [segment.strip().rstrip('/R') for segment in stderrdata.strip().split()]
+        print 'tops found: {}'.format(flattened)
+        return flattened
+
+    def get_bounding_box_coords_for_entire_db(self, name_list):
+        part_names = ' '.join(name_list)
+        return self.get_bounding_box_coords(part_names)
+
+    def get_bounding_box_coords(self, obj_name):
+        """
+        The "l" command displays a verbose description about the specified list of objects.
+        If a specified object is a path, then any transformation matrices along that path are applied.
+        If the final path component is a combination, the command will list the Boolean formula for the 
+        combination and will indicate any accumulated transformations (including any in that combination).
+        If a shader and/or color has been assigned to the combination, the details will be listed.
+        For a region, its ident, air code, material code, and LOS will also be listed.
+        For primitive shapes, detailed shape parameters will be displayed with the accumulated transformation 
+        applied. If the -r (recursive) option is used, then each object on the command line will be treated 
+        as a path. If the path does not end at a primitive shape, then all possible paths from that point 
+        down to individual shapes will be considered. The shape at the end of each possible path will be 
+        listed with its parameters adjusted by the accumulated transformation.
+        """
+        proc = subprocess.Popen('mged {} "make_bb temp_box {}; l temp_box"'.format(self.g_path, obj_name),
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                shell=True)
+        
+        (stdoutdata, stderrdata) = proc.communicate()
+        # print (stdoutdata, stderrdata)
+        subprocess.Popen('mged {} "kill temp_box"'.format(self.g_path), shell=True).communicate()
+
+        bb_coords = []
+        print 'stderrdata.split {}'.format(stderrdata.split('\n')[1:])
+        for segment in stderrdata.split('\n')[1:]:
+            if '(' not in segment:
+                continue
+            first_paren = segment.index('(')
+            second_paren = segment.index(')')
+            x,y,z = segment[first_paren+1:second_paren].split(',')
+            
+            x=float(x)
+            y=float(y)
+            z=float(z)
+            bb_coords.append((x, y, z))
+            print '(x, y, z) {}'.format((x, y, z))
+        print bb_coords
+        return bb_coords
+
+    def get_opposing_corners_bounding_box(self, bb_coords):
+        _bb_coords = sorted(list(bb_coords))
+        # take any of corners
+        first = _bb_coords.pop()
+        # now find one that opposes it
+        for axis in {0: 'x', 1: 'y', 2: 'z'}:
+            for coord in list(_bb_coords):
+                if coord[axis] == first[axis]:
+                    _bb_coords.remove(coord)
+        second = _bb_coords[0]
+        return (first, second)
+
     def set_combination_color(self, obj_name, R, G, B):
         is_string(obj_name)
         self.script_string += 'comb_color {} {} {} {}'.format(obj_name, R, G, B)
@@ -159,6 +281,10 @@ class brlcad_tcl():
     def combination(self, name, operation):
         is_string(name)
         self.script_string += 'comb {} {}\n'.format(name, operation)
+
+    def group(self, name, operation):
+        is_string(name)
+        self.script_string += 'g {} {}\n'.format(name, operation)
 
     def region(self, name, operation):
         is_string(name)
@@ -168,6 +294,11 @@ class brlcad_tcl():
         self.script_string += 'Z\n'
         self.script_string += 'draw {}\n'.format(combination_to_select)
         self.script_string += 'oed / {0}/{1}\n'.format(combination_to_select, path_to_center)
+
+    def begin_primitive_edit(self, name):
+        #self.script_string += 'Z\n'
+        #self.script_string += 'draw {}\n'.format(name)
+        self.script_string += 'sed {0}\n'.format(name)
 
     def end_combination_edit(self):
         self.script_string += 'accept\n'

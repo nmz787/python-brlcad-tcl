@@ -22,3 +22,5 @@ To view the resulting (.g) file in `mged`:
 I was running this example then opening the resulting (.STL) file in meshlab (because I don't know how/if mged has a real-time raytracing display mode) :
 * `python multi_part_example.py multi_part.tcl && meshlab multi_part.stl`
 
+## Example of slicing a model and exporting to individual STL files:
+![Alt text](examples/output/microfluidic_pump_slices_manually_created_animation.gif?raw=true "Animated GIF of the STL slices being shown and hidden")
