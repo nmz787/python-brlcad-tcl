@@ -1,34 +1,67 @@
+import os
 import numbers
 from itertools import chain
 import datetime
 import subprocess
-import os
+from itertools import chain
+from abc import ABCMeta
+from abc import abstractmethod
 from collections import OrderedDict, deque
 
 import vmath
+
+
+def coord_avg(c1, c2):
+    return (c1+c2)/2.
+
+def get_box_face_center_coord(corner1, corner2, xyz_desired):
+    # each 'bit' can be -1, 0, or 1
+    x_bit, y_bit, z_bit =  [int(b) for b in xyz_desired]
+    # only one non-zero value can be provided
+    assert([x_bit!=0, y_bit!=0, z_bit!=0].count(True) == 1)
+    out_xyz = [0,0,0]
+    away_vect = [0,0,0]
+    for i, bit in enumerate([x_bit, y_bit, z_bit]):
+        if bit<0:
+            out_xyz[i] = min(corner1[i], corner2[i])
+            away_vect[i] = -1
+        elif bit>0:
+            out_xyz[i] = max(corner1[i], corner2[i])
+            away_vect[i] = 1
+        else:
+            out_xyz[i] = min(corner1[i], corner2[i]) + (abs(corner1[i] - corner2[i]) / 2.)
+    return out_xyz, away_vect
+
 
 def is_truple(arg):
     is_numeric_truple = (isinstance(arg, tuple) or isinstance(arg, list)) and all([isinstance(x, numbers.Number) for x in arg])
     assert(is_numeric_truple)
 
+
 def is_number(arg):
     assert(isinstance(arg, numbers.Number))
+
 
 def two_plus_strings(*args):
     assert(len(args)>2)
     assert(all([isinstance(x, str) for x in args]))
 
+
 def is_string(name):
     assert(isinstance(name, str))
+
 
 def union(*args):
     return ' u {}'.format(' u '.join(args))
 
+
 def subtract(*args):
     return ' u {}'.format(' - '.join(args))
 
+
 def intersect(*args):
     return ' u {}'.format(' + '.join(args))
+
 
 class brlcad_tcl():
     def __init__(self, tcl_filepath, title, make_g=False, make_stl=False, stl_quality=None, units = 'mm'):
@@ -37,11 +70,13 @@ class brlcad_tcl():
         #    if not
         self.make_stl = make_stl
         self.make_g = make_g
+        self.g_path = None
         self.tcl_filepath = tcl_filepath
         self.stl_quality = stl_quality
         self.now_path = os.path.splitext(self.tcl_filepath)[0]
 
         self.script_string = 'title {}\nunits {}\n'.format(title, units)
+        self.units = units
 
     def __enter__(self):
         return self
@@ -55,7 +90,7 @@ class brlcad_tcl():
             self.save_stl()
             
     def add_script_string(self, to_add):
-        #In case the user does some adding on their own
+        # In case the user does some adding on their own
         self.script_string += '\n' + str(to_add) + '\n'
 
     def save_tcl(self):
@@ -69,12 +104,12 @@ class brlcad_tcl():
             os.remove(self.g_path)
         except:
             pass
-		
+
         proc = subprocess.Popen('mged {} < {}'.format(self.g_path, self.tcl_filepath), shell=True)
         proc.communicate()
         
     def run_and_save_stl(self, objects_to_render):
-        #Do all of them in one go
+        # Do all of them in one go
         self.save_tcl()
         self.save_g()
         self.save_stl(objects_to_render)
@@ -84,7 +119,7 @@ class brlcad_tcl():
         obj_str = ' '.join(objects_to_render)
         cmd = 'g-stl -o {}'.format(stl_path)
 
-        #Add the quality
+        # Add the quality
         """   from http://sourceforge.net/p/brlcad/support-requests/14/#0ced
         The "-a" option specifies an absolute tessellation tolerance
         - the maximum allowed distance (mm) between the real surface
@@ -109,13 +144,14 @@ class brlcad_tcl():
         if self.stl_quality and self.stl_quality > 0:
             cmd = '{} -a {}'.format(cmd, self.stl_quality)
 
-        #Add the paths
+        # Add the paths
         cmd = '{} {} {}'.format(cmd, self.g_path, obj_str)
 
         print cmd
         proc = subprocess.Popen(cmd, shell=True)
         proc.communicate()
 
+    
     def set_combination_color(self, obj_name, R, G, B):
         is_string(obj_name)
         self.script_string += 'comb_color {} {} {} {}'.format(obj_name, R, G, B)
@@ -148,6 +184,16 @@ class brlcad_tcl():
     def rotate_combination(self, x, y, z):
         self.script_string += 'orot {} {} {}\n'.format(x,y,z)
 
+    def rotate_primitive(self, name, x, y, z, angle=None):
+        is_string(name)
+        self.begin_primitive_edit(name)
+        self.script_string += 'keypoint {} {} {}\n'.format(x,y,z)
+        if angle:
+            self.script_string += 'arot {} {} {} {}\n'.format(x,y,z, angle)
+        else:
+            self.script_string += 'rot {} {} {}\n'.format(x,y,z)
+        self.end_combination_edit()
+
     def kill(self, name):
         if isinstance(name, list):
             for _name in name:
@@ -166,6 +212,24 @@ class brlcad_tcl():
                                                                      bx,by,bz,
                                                                      hx,hy,hz,
                                                                      radius)
+
+    def rpc(self, name, vertex, height_vector, base_vector, half_width):
+        is_string(name)
+        is_truple(vertex)
+        is_truple(height_vector)
+        is_truple(base_vector)
+        is_number(half_width)
+        vx, vy, vz = vertex
+        hx, hy, hz = height_vector
+        bx, by, bz = base_vector
+        self.script_string += 'in {} rpc {} {} {} {} {} {} {} {} {} {}\n'.format(name,
+                                                                                 vx,vy,vz,
+                                                                                 hx,hy,hz,
+                                                                                 bx,by,bz,
+                                                                                 half_width)
+
+    def box_by_opposite_corners(self, name, pmin, pmax):
+        self.rpp(self, name, pmin, pmax)
 
     def circular_cylinder(self, name, base_center_point, top_center_point, radius):
         self.rcc(name, base_center_point, top_center_point, radius)
@@ -302,8 +366,23 @@ class brlcad_tcl():
 
 
 class BrlCadModel(object):
+    __metaclass__ = ABCMeta
     def __init__(self, brl_db, name_tracker):
         self.brl_db = brl_db
         self.name_tracker = name_tracker
         self.get_next_name = self.name_tracker.get_next_name
         self.final_name = None
+        self.connection_points = []
+
+    def register_new_connection_point(self, name, coord, away_vector):
+        self.connection_points.append((name, coord, away_vector))
+
+    def get_connection(self, name):
+        for item in self.connection_points:
+            if item[0] == name:
+                return item
+        return None
+
+    @property
+    def connections_available(self):
+        return [item[0] for item in self.connection_points]
