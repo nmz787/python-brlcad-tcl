@@ -2,6 +2,7 @@
 A simple class counts how many of a certain part-name has been requested, and returns the part-name with the counter appended.
 """
 
+
 class BrlcadNameTracker(object):
     def __init__(self):
         self.num_parts_in_use_by_part_name = {}

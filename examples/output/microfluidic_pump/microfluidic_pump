@@ -1,0 +1,19 @@
+title My Database
+units mm
+in peristaltic_3_finger_pump__f11.s rpp 0 1000 0 4000 0 1000
+in peristaltic_3_finger_pump__f21.s rpp 2000 3000 0 4000 0 1000
+in peristaltic_3_finger_pump__f31.s rpp 4000 5000 0 4000 0 1000
+in peristaltic_3_finger_pump__flowtube1.s rpp -1000 6000 1000 3000 -500 0
+r peristaltic_3_finger_pump__COMPLETE1.r u peristaltic_3_finger_pump__f11.s u peristaltic_3_finger_pump__f21.s u peristaltic_3_finger_pump__f31.s u peristaltic_3_finger_pump__flowtube1.s
+in ap.s rcc 500.0 0 500.0 0 -5000 0 750
+in bp.s rcc 2500.0 0 500.0 0 -5000 0 750
+in cp.s rcc 4500.0 0 500.0 0 -5000 0 750
+in fi.s rcc -1000 2000.0 -250.0 -5000 0 0 100
+in fo.s rcc 6000 2000.0 -250.0 5000 0 0 100
+r new_peristaltic_3_finger_pump__COMPLETE1.r u peristaltic_3_finger_pump__COMPLETE1.r u ap.s u bp.s u cp.s u fi.s u fo.s
+in brlcad_tcl__slice_bb0_num3.s rpp -6000.0 11000.0 -5000.0 4000.0 -500.0 83.3333333333
+comb brlcad_tcl__slice0_num3.c u brlcad_tcl__slice_bb0_num3.s + new_peristaltic_3_finger_pump__COMPLETE1.r
+in brlcad_tcl__slice_bb1_num3.s rpp -6000.0 11000.0 -5000.0 4000.0 83.3333333333 666.666666667
+comb brlcad_tcl__slice1_num3.c u brlcad_tcl__slice_bb1_num3.s + new_peristaltic_3_finger_pump__COMPLETE1.r
+in brlcad_tcl__slice_bb2_num3.s rpp -6000.0 11000.0 -5000.0 4000.0 666.666666667 1250.0
+comb brlcad_tcl__slice2_num3.c u brlcad_tcl__slice_bb2_num3.s + new_peristaltic_3_finger_pump__COMPLETE1.r

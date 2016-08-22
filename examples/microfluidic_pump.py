@@ -1,21 +1,14 @@
-# sys has argv
-import sys
-
-#from brlcad.primitives import union, subtract
-#import brlcad.wdb as wdb
-# sys has argv
-import sys
-import os
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
+if __name__ == "__main__":
+    import os
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
 
 from brlcad_tcl import *
-from brlcad_name_tracker import BrlcadNameTracker
 
 
 class peristaltic_3_finger_pump(BrlCadModel):
-    def __init__(self, brl_db, name_tracker):
-        super(peristaltic_3_finger_pump, self). __init__(brl_db, name_tracker)
+    def __init__(self, brl_db):
+        super(peristaltic_3_finger_pump, self). __init__(brl_db)
         self.center_name = None
 
         # units are in microns
@@ -87,11 +80,10 @@ class peristaltic_3_finger_pump(BrlCadModel):
         print('pump done')
 
 
-def main(argv):
-    #with wdb.WDB(argv[1], "My Database") as brl_db:
-    with brlcad_tcl(argv[1], "My Database") as brl_db:
-        name_tracker = BrlcadNameTracker()
-        pump = peristaltic_3_finger_pump(brl_db, name_tracker)
+if __name__ == "__main__":
+    g_path_out = check_cmdline_args(__file__)
+    with brlcad_tcl(g_path_out, "My Database") as brl_db:
+        pump = peristaltic_3_finger_pump(brl_db)
 
         # tack on some pipes to the pneumatic and hydraluic connections
         # scale the 'away vector' dimension by 5000 to get some length
@@ -118,34 +110,34 @@ def main(argv):
         brl_db.region(final_name,
                       'u {} u {} u {} u {} u {} u {}'
                       .format(pump.final_name,
-                              'ap.s', 
-                              'bp.s', 
-                              'cp.s', 
-                              'fi.s', 
+                              'ap.s',
+                              'bp.s',
+                              'cp.s',
+                              'fi.s',
                               'fo.s')
                       )
-
-
-        
-
-        # All units in the database file are stored in millimeters. This constrains
-        # the arguments to the mk_* routines to also be in millimeters.
-    # process the tcl script into a g database by calling mged
-    brl_db.save_g()
-    orig_path = brl_db.now_path
-    slice_coords = brl_db.export_slices(300, 30000,30000)
-    
-    for i, sc in enumerate(slice_coords):
-      brl_db.now_path = orig_path + str(i)
-      if i==0:
-        brl_db.run_and_save_stl(['slice{}.r'.format(i)])
-      else:
-        brl_db.save_stl(['slice{}.r'.format(i)])
-    
-    brl_db.now_path = orig_path
+    print '*' * 80
+    brl_db.export_model_slices(num_slices_desired=10,
+                               max_slice_x=30000,
+                               max_slice_y=30000,
+                               output_format='raster',
+                               output_option_kwargs={'output_greyscale': True}
+                               )
+    print '*' * 80
+    brl_db.export_model_slices(num_slices_desired=10,
+                               max_slice_x=30000,
+                               max_slice_y=30000,
+                               output_format='raster',
+                               output_option_kwargs={'output_greyscale': False},
+                               output_path_format='{}_bw_{}.jpg'
+                               )
+    print '*' * 80
+    brl_db.export_model_slices(num_slices_desired=3,
+                               max_slice_x=30000,
+                               max_slice_y=30000,
+                               output_format='stl',
+                               output_path_format='{}_slice_{}'
+                               )
+    print '*' * 80
     # process the g database into an STL file with a list of regions
-    brl_db.save_stl([final_name])#, aerosol_can_cap.final_name])
-    
-
-if __name__ == "__main__":
-    main(sys.argv)
+    brl_db.save_stl([final_name])

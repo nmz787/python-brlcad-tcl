@@ -1,4 +1,7 @@
+# standard libs
 import os
+import re
+import sys
 import numbers
 import datetime
 import subprocess
@@ -7,11 +10,26 @@ from abc import ABCMeta
 from abc import abstractmethod
 from collections import OrderedDict, deque
 
+# external libs
+import numpy
+from PIL import Image
+
+# internal
 import vmath
+from brlcad_name_tracker import BrlcadNameTracker
+
+
+def check_cmdline_args(file_path):
+    if not len(sys.argv)==2:
+        print 'usage:\n'\
+              '      {} file_name_for_output'.format(file_path)
+        sys.exit(1)
+    return sys.argv[1]
 
 
 def coord_avg(c1, c2):
     return (c1+c2)/2.
+
 
 def get_box_face_center_coord(corner1, corner2, xyz_desired):
     # each 'bit' can be -1, 0, or 1
@@ -63,7 +81,7 @@ def intersect(*args):
 
 
 class brlcad_tcl():
-    def __init__(self, tcl_filepath, title, make_g=False, make_stl=False, stl_quality=None, units = 'mm'):
+    def __init__(self, tcl_filepath, title, make_g=False, make_stl=False, stl_quality=None, units='mm'):
         #if not os.path.isfile(self.output_filepath):
         #    abs_path = os.path.abspath(self.output_filepath)
         #    if not
@@ -76,6 +94,8 @@ class brlcad_tcl():
 
         self.script_string = 'title {}\nunits {}\n'.format(title, units)
         self.units = units
+        self.name_tracker = BrlcadNameTracker()
+        self.verbose = False
 
     def __enter__(self):
         return self
@@ -103,8 +123,11 @@ class brlcad_tcl():
             os.remove(self.g_path)
         except:
             pass
-
-        proc = subprocess.Popen('mged {} < {}'.format(self.g_path, self.tcl_filepath), shell=True)
+        if self.verbose:
+            proc = subprocess.Popen('mged {} < {}'.format(self.g_path, self.tcl_filepath), shell=True)
+        else:
+            proc = subprocess.Popen('mged {} < {}'.format(self.g_path, self.tcl_filepath), shell=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         proc.communicate()
         
     def run_and_save_stl(self, objects_to_render):
@@ -146,14 +169,14 @@ class brlcad_tcl():
         # Add the paths
         cmd = '{} {} {}'.format(cmd, self.g_path, obj_str)
 
-        print cmd
-        proc = subprocess.Popen(cmd, shell=True)
+        print 'running: {}'.format(cmd)
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         proc.communicate()
 
-    def export_slices(self, slice_thickness, max_slice_x, max_slice_y, output_format=''):
+    def create_slice_regions(self, slice_thickness, max_slice_x, max_slice_y, output_format=''):
         tl_names = self.get_top_level_object_names()
         xyz1, xyz2 = self.get_opposing_corners_bounding_box(self.get_bounding_box_coords_for_entire_db(tl_names))
-        print 'bb of all items {} to {}'.format(xyz1, xyz2)
+        # print 'bb of all items {} to {}'.format(xyz1, xyz2)
 
         if abs(xyz1[0] - xyz2[0]) > max_slice_x:
             raise Exception('x dimension exceeds buildable bounds')
@@ -161,22 +184,260 @@ class brlcad_tcl():
             raise Exception('y dimension exceeds buildable bounds')
 
         slice_coords = list(self.get_object_slice_coords(slice_thickness, xyz1, xyz2))
+        self.slice_coords = []
+        temps_to_kill = []
 
         for i, object_slice_bb_coords in enumerate(slice_coords):
-            print 'slice_bb{}.s'.format(i)
-            self.cuboid('slice_bb{}.s'.format(i), object_slice_bb_coords[0], object_slice_bb_coords[1])
+            slice_bb_temp = self.name_tracker.get_next_name(self, 'slice_bb{}_num.s'.format(i))
+            temps_to_kill.append(slice_bb_temp)
+            self.cuboid(slice_bb_temp, object_slice_bb_coords[0], object_slice_bb_coords[1])
             # finally create a region (a special combination that means it's going to be rendered)
             # by unioning together the main combinations we just created
             tl_name_plussed = ' + '.join(tl_names)
-            slice_reg_name = 'slice{}.r'.format(i)
-            self.region(slice_reg_name,
-                          'u slice_bb{}.s + {}'.format(i, tl_name_plussed)
-                          )
-        return slice_coords
-            # save_object_image_from_z_projection(object_slice, output_format)
+            slice_reg_name = self.name_tracker.get_next_name(self, 'slice{}_num.c'.format(i))
+            temps_to_kill.append(slice_reg_name)
+            self.combination(slice_reg_name,
+                        'u {} + {}'.format(slice_bb_temp, tl_name_plussed)
+                        )
+            self.slice_coords.append((slice_reg_name, object_slice_bb_coords))
+        self.save_tcl()
+        self.save_g()
+        # [self.kill(temp_bb) for temp_bb in temps_to_kill]
+        # self.save_tcl()
+        # self.save_g()
+        return self.slice_coords, temps_to_kill
 
-    def get_object_slice_coords(self, slice_thickness, xyz1, xyz2):
-        # num_slices = abs(xy1[2] - xy2[2]) / slice_thickeness
+    def get_object_raster_from_z_projection(self,
+                                            slice_region_name,
+                                            model_min,
+                                            model_max,
+                                            slice_thickness,
+                                            ray_destination_dir_xyz=[0, 0, -1],
+                                            bmp_output_name=None,
+                                            num_pix_x=1024,
+                                            num_pix_y=1024,
+                                            output_greyscale=True,
+                                            threading_event=None):
+        # each 'bit' can be -1, 0, or 1
+        x_bit, y_bit, z_bit = [int(b) for b in ray_destination_dir_xyz]
+        # only one non-zero value can be provided
+        assert([x_bit!=0, y_bit!=0, z_bit!=0].count(True) == 1)
+
+        model_width = model_max[0] - model_min[0]
+        model_length = model_max[1] - model_min[1]
+        x_offset = (0-model_min[0])
+        y_offset = (0-model_min[1])
+
+        x_scale = num_pix_x/model_width
+        y_scale = num_pix_y/model_length
+
+        x_step = model_width/num_pix_x
+        y_step = model_length/num_pix_y
+
+        step_size = max(x_step, y_step)
+        # the -s command might speed things up???
+        args = ['nirt', '-s', self.g_path, slice_region_name]
+        print '\nrunning: {}'.format(' '.join(args))
+        p = subprocess.Popen(args,
+                             stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        if threading_event:
+            threading_event.set()
+        # create a list for the NIRT command lines to be queued
+        lins=[]
+        # set the direction to fire rays in
+        lins.append('dir {} {} {}'.format(x_bit, y_bit, z_bit))
+        lins.append('units {}'.format(self.units))
+        x = model_min[0]
+        z = model_max[2]
+
+        xstepcount = 0
+        # the raster loops, loop over each Y for each X location
+        while x < model_max[0]:
+            # start Y at the minimum for each Y loop
+            y = model_min[1]
+            ystepcount = 0
+            # loop while Y is less than the model's max Y
+            while y < model_max[1]:
+                # move around the model in X and Y axes, using the determined step-size
+                lins.append('xyz {} {} {}'.format(x, y, z))
+                # fire a ray
+                lins.append('s')
+                # step in Y
+                y += step_size
+                ystepcount += 1
+            # make sure we aren't going out-of-bounds
+            assert ystepcount <= num_pix_y, ystepcount
+            # step in X
+            x += step_size
+            xstepcount += 1
+        # make sure we aren't going out-of-bounds
+        assert xstepcount <= num_pix_x, xstepcount
+
+        # pass the commands to NIRT, get NIRT's response
+        outp = p.communicate('\n'.join(lins))
+
+        chunks = []
+        # break up NIRT's response by newline
+        out_lines = outp[0].split('\n')
+        err_lines = outp[1].split('\n')
+        
+        im = numpy.zeros((num_pix_x, num_pix_y))
+        # r = re.compile(r'\((\s*-?\d+\.?\d+)\s+(-?\d+\.?\d+)\s+(-?\d+\.?\d+)\)')
+        r = re.compile(r'\((\s*-?\d+\.?\d+)\s+(-?\d+\.?\d+)\s+(-?\d+\.?\d+)\)\s+(-?\d+\.?\d+)')
+        hit_description_header = '    Region Name               Entry (x y z)              LOS  Obliq_in Attrib'
+        missed_target = 'You missed the target'
+        state = 0
+
+        decade = len(out_lines)/10
+        for il, l in enumerate(out_lines):
+            # if il%decade==0:
+            #     print '{}% completed parsing NIRT output'.format(float(il)/len(out_lines)*100)
+
+            # check if we are starting a new section IF:
+            # we are just starting, or we got at least one coordinate
+            if (state == 0 or state == 3) and l.startswith('Origin'):
+                    # and out_lines[out_lines.index(l)+1].startswith('Direction'):
+                state = 1
+                chunks.append({'Origin': l, 'Coords': []})
+            elif state == 1:
+                state = 2
+                chunks[-1]['Direction'] = l
+            elif state == 2:
+                if l.startswith(hit_description_header) or (not l):
+                    continue
+                # we got a hit or miss
+                state = 3
+                if missed_target in l:
+                    continue
+                # store the line for later
+                chunks[-1]['Coords'].append(l)
+                m = r.search(l)
+                if not m:
+                    print 'first 10 lines out:\n{}'.format(out_lines[:10])
+                    print 'first err:\n{}'.format(err_lines[:1])
+                    raise Exception("regex didn't work to find coordinates! report this bug. on input line {}".format(l))
+                x, y, z, depth_of_hit = m.groups()
+
+                zeroed_x = (float(x) - model_min[0])
+                zeroed_y = (float(y) - model_min[1])
+                if zeroed_x:
+                    floated_x = zeroed_x/step_size
+                    int_x = int(round(floated_x))
+                    # enable this if you are paranoid about the math
+                    # numpy.testing.assert_approx_equal(floated_x, int_x, 4, 'these were not equal:\n{}\n{}'.format(floated_x, int_x))
+                else:
+                    int_x = 0
+                if zeroed_y:
+                    floated_y = zeroed_y/step_size
+                    int_y = int(round(floated_y))
+                    # enable this if you are paranoid about the math
+                    # numpy.testing.assert_approx_equal(floated_y, int_y, 4, 'these were not equal:\n{}\n{}'.format(floated_y, int_y))
+                else:
+                    int_y = 0
+
+                if output_greyscale:
+                    im[int_x, int_y] = (float(depth_of_hit)/slice_thickness)*255
+                else:
+                    im[int_x, int_y] = 1
+
+            elif state==3:
+                # we already got a hit for this spot, so we don't need to check again
+                continue
+
+        if output_greyscale:
+            result = Image.fromarray(im.astype(numpy.uint8))
+        else:
+            result = Image.fromarray((im * 255).astype(numpy.uint8))
+        result.save(bmp_output_name)
+
+    def export_model_slices(self,
+                            num_slices_desired,
+                            max_slice_x, max_slice_y,
+                            output_format='stl', output_option_kwargs={}, output_path_format=None):
+        """
+
+        :param num_slices_desired:    the number of equal-sized slices you want to end up with
+        :param max_slice_x:           the maximum X dimension you want to export (in model units)
+        :param max_slice_y:           the maximum Y dimension you want to export (in model units)
+        :param output_format:         either 'raster' or 'stl' currently
+        :param output_option_kwargs:  i.e. 'raster' format supports 'greyscale_output':True/False
+        :param output_path_format:    a string with two {} that the g-database path and slice-num are inserted into
+        :return:                      nothing
+        """
+        orig_path = self.now_path
+        orig_tcl = self.script_string
+        self.save_tcl()
+        self.save_g()
+        # calculate the slice thickness needed to get the number of slices requested
+        tl_names = self.get_top_level_object_names()
+        print 'top level names about to be exported: {}'.format(tl_names)
+        xyz1, xyz2 = self.get_opposing_corners_bounding_box(self.get_bounding_box_coords_for_entire_db(tl_names))
+        print 'top level items bounding-box: {} to {}'.format(xyz1, xyz2)
+
+        slice_thickness = abs(xyz2[2] - xyz1[2]) / float(num_slices_desired)
+
+        # now create the slice regions
+        slice_coords, temps_to_kill = self.create_slice_regions(slice_thickness, max_slice_x, max_slice_y)
+
+        import threading
+        threads = []
+        for i, (slice_obj_name, sc) in enumerate(slice_coords):
+            if output_format == 'raster':
+                if not output_path_format:
+                    output_path_format='{}{}.jpg'
+                e = threading.Event()
+                output_filename = output_path_format.format(self.now_path, i)
+                default_raster_kwargs = {'bmp_output_name': output_filename,
+                                         'threading_event': e}
+                default_raster_kwargs.update(output_option_kwargs)
+                t = threading.Thread(target=self.get_object_raster_from_z_projection,
+                                     args=(slice_obj_name,
+                                           sc[0],
+                                           sc[1],
+                                           slice_thickness),
+                                     kwargs=default_raster_kwargs)
+                t.daemon = True
+                t.start()
+                # try waiting for NIRT to finish, before starting the next thread
+                e.wait()
+                # TODO: improve speed of NIRT jobs if possible
+                # calling multiple NIRT processes at once doesn't seem to work
+                # just wait for each thread to finish
+                t.join()
+                threads.append(t)
+                # allow a max of 4 NIRT process threads
+                while len(threads) >= 4:
+                    threads.pop(0).join()
+            elif output_format == 'stl':
+                if not output_path_format:
+                    output_path_format = '{}{}'
+
+                self.now_path = output_path_format.format(orig_path, i)
+
+                if i == 0:
+                    self.run_and_save_stl([slice_obj_name])
+                else:
+                    self.save_stl([slice_obj_name])
+
+        # post-loop output-format specific stuff
+        if output_format == 'raster':
+            while threads:
+                threads.pop(0).join()
+            self.script_string = ''
+            # get rid of the slices, so they don't show up as top-level objects if user exports slices again
+            # destroy the objects in the reverse order of how they were created
+            # [self.kill(temp_bb) for temp_bb in reversed(temps_to_kill)]
+            # self.save_tcl()
+            # self.save_g()
+            self.script_string = orig_tcl
+            self.save_tcl()
+        elif output_format == 'stl':
+            self.now_path = orig_path
+
+    @staticmethod
+    def get_object_slice_coords(slice_thickness, xyz1, xyz2):
         lz = min(xyz1[2], xyz2[2])
         mz = max(xyz1[2], xyz2[2])
         iz = lz
@@ -185,17 +446,15 @@ class brlcad_tcl():
             c1[2] = iz
             c2 = [c for c in xyz2]
             iz += slice_thickness
-            if iz>mz:
-                iz=mz
+            if iz > mz:
+                iz = mz
             c2[2] = iz
             for i in range(3):
-                if c1[i]>c2[i]:
+                if c1[i] > c2[i]:
                     g = c1[i]
                     c1[i] = c2[i]
                     c2[i] = g
             yield (c1, c2)
-        #direction
-        #for  in range():
 
     def get_top_level_object_names(self):
         """
@@ -212,10 +471,10 @@ class brlcad_tcl():
                                 stderr=subprocess.PIPE,
                                 shell=True)
         (stdoutdata, stderrdata) = proc.communicate()
-        print stdoutdata
-        print stderrdata
+        # print stdoutdata
+        # print stderrdata
         flattened = [segment.strip().rstrip('/R') for segment in stderrdata.strip().split()]
-        print 'tops found: {}'.format(flattened)
+        # print 'tops found: {}'.format(flattened)
         return flattened
 
     def get_bounding_box_coords_for_entire_db(self, name_list):
@@ -246,20 +505,20 @@ class brlcad_tcl():
         subprocess.Popen('mged {} "kill temp_box"'.format(self.g_path), shell=True).communicate()
 
         bb_coords = []
-        print 'stderrdata.split {}'.format(stderrdata.split('\n')[1:])
+        # print 'stderrdata.split {}'.format(stderrdata.split('\n')[1:])
         for segment in stderrdata.split('\n')[1:]:
             if '(' not in segment:
                 continue
             first_paren = segment.index('(')
             second_paren = segment.index(')')
-            x,y,z = segment[first_paren+1:second_paren].split(',')
+            x, y, z = segment[first_paren+1:second_paren].split(',')
             
-            x=float(x)
-            y=float(y)
-            z=float(z)
+            x = float(x)
+            y = float(y)
+            z = float(z)
             bb_coords.append((x, y, z))
-            print '(x, y, z) {}'.format((x, y, z))
-        print bb_coords
+            # print '(x, y, z) {}'.format((x, y, z))
+        # print bb_coords
         return bb_coords
 
     def get_opposing_corners_bounding_box(self, bb_coords):
@@ -313,16 +572,16 @@ class brlcad_tcl():
         self.translate(dx, dy, dz, relative=True)
 
     def rotate_combination(self, x, y, z):
-        self.script_string += 'orot {} {} {}\n'.format(x,y,z)
+        self.script_string += 'orot {} {} {}\n'.format(x, y, z)
 
     def rotate_primitive(self, name, x, y, z, angle=None):
         is_string(name)
         self.begin_primitive_edit(name)
-        self.script_string += 'keypoint {} {} {}\n'.format(x,y,z)
+        self.script_string += 'keypoint {} {} {}\n'.format(x, y, z)
         if angle:
-            self.script_string += 'arot {} {} {} {}\n'.format(x,y,z, angle)
+            self.script_string += 'arot {} {} {} {}\n'.format(x, y, z, angle)
         else:
-            self.script_string += 'rot {} {} {}\n'.format(x,y,z)
+            self.script_string += 'rot {} {} {}\n'.format(x, y, z)
         self.end_combination_edit()
 
     def kill(self, name):
@@ -337,12 +596,12 @@ class brlcad_tcl():
         is_truple(base)
         is_truple(height)
         is_number(radius)
-        bx, by,bz=base
-        hx,hy,hz=height
+        bx, by, bz = base
+        hx, hy, hz = height
         self.script_string += 'in {} rcc {} {} {} {} {} {} {}\n'.format(name,
-                                                                     bx,by,bz,
-                                                                     hx,hy,hz,
-                                                                     radius)
+                                                                        bx, by, bz,
+                                                                        hx, hy, hz,
+                                                                        radius)
 
     def rpc(self, name, vertex, height_vector, base_vector, half_width):
         is_string(name)
@@ -402,7 +661,6 @@ class brlcad_tcl():
         self.script_string += 'in {} arb8 {} \n'.format(name,
                                                         points_list
                                                         )
-
                                                         
     def arbX(self, name, vList):
         #Detect which function to use, and feed in the parameters
@@ -412,18 +670,14 @@ class brlcad_tcl():
             #Execute it
             arbFunction(name, *vList)
         
-        
     def Cone(self, name, trc, vertex, height_vector, base_radius, top_radius):
         is_string(name)
-
 
     def Cone_elliptical(self, name, tec, vertex, height_vector, major_axis, minor_axis, ratio):
         is_string(name)
 
-
     def Cone_general(self, name, tgc, vertex, height_vector, avector, bvector, cscalar, dscalar):
         is_string(name)
-
 
     def Cylinder(self, name, vertex, height_vector, radius):
         self.rcc(name, vertex, height_vector, radius)
@@ -446,26 +700,20 @@ class brlcad_tcl():
     def Paraboloid_elliptical(self, name, epa, vertex, height_vector, avector, bscalar):
         is_string(name)
 
-
     def Ellipsoid_radius(self, name, ell1, vertex, radius):
         is_string(name)
-
 
     def Particle(self, name, part, vertex, height_vector, radius_at_v_end, radius_at_h_end):
         is_string(name)
 
-
     def Sphere(self, name, sph, vertex, radius):
         is_string(name)
-
 
     def Torus(self, name, tor, vertex, normal, radius_1, radius_2):
         is_string(name)
 
-
     def Torus_elliptical(self, name, eto, vertex, normal_vector, radius, cvector, axis):
         is_string(name)
-
 
     def pipe_point(self, x, y, z, inner_diameter, outer_diameter, bend_radius):
         return OrderedDict(
@@ -489,7 +737,7 @@ class brlcad_tcl():
         elif isinstance(pipe_points[0][0], vmath.vector.Vector):
             def rotate_tuple(x): d = deque(list(x)); d.rotate(2); return d
             points_str_list = ['{} {} {} {} {} {}'.format(*(list(points[0]) + list(rotate_tuple(points[1:]))) ) for points in pipe_points]
-        self.script_string += 'in {} pipe {} {}\n'.format(name, num_points, ' '.join(points_str_list) )
+        self.script_string += 'in {} pipe {} {}\n'.format(name, num_points, ' '.join(points_str_list))
         """ # this worked for me as a spring
         in spring.s pipe 10 -500 -500 250 10 200 500 -500 500 350 100 200 500 500 500 450 100 200 500 500 -500 550 100 200 500 -500 -500 650 100 200 500 -500 500 750 100 200 500 500 500 850 100 200 500 500 -500 950 100 200 500 -500 -500 1050 100 200 500 -500 500 1150 100 200 500 0 500 1200 100 200 500
         r s.r u spring.s
@@ -498,9 +746,10 @@ class brlcad_tcl():
 
 class BrlCadModel(object):
     __metaclass__ = ABCMeta
-    def __init__(self, brl_db, name_tracker):
+
+    def __init__(self, brl_db):
         self.brl_db = brl_db
-        self.name_tracker = name_tracker
+        self.name_tracker = brl_db.name_tracker
         self.get_next_name = self.name_tracker.get_next_name
         self.final_name = None
         self.connection_points = []

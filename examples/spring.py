@@ -7,20 +7,18 @@ Run with:
 python spring.py spring.tcl
 """
 
-# sys has argv
-import sys
-import os
+if __name__ == "__main__":
+    import os
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
 from brlcad_tcl import *
-from brlcad_name_tracker import BrlcadNameTracker
+
         
-def main(argv):
-    #with wdb.WDB(argv[1], "My Database") as brl_db:
-    with brlcad_tcl(argv[1], "My Database1", stl_quality=0.5) as brl_db:
-        name_tracker = BrlcadNameTracker()
-        
-        
+if __name__ == "__main__":
+    g_path_out = check_cmdline_args(__file__)
+    with brlcad_tcl(g_path_out, "My Database1", stl_quality=0.5) as brl_db:
+
         # create a lookup table for 4 X,Y points on the spring circumference
         spring_outline_x_y_tuples = [(-50,-50), (-50,50), (50,50), (50,-50)]
         # create points, using the 10 for the z-step between points on the circumference.
@@ -46,7 +44,3 @@ def main(argv):
     brl_db.save_g()
     # process the g database into an STL file with a list of regions
     brl_db.save_stl(['spring.r'])
-
-
-if __name__ == "__main__":
-    main(sys.argv)

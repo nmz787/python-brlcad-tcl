@@ -12,21 +12,20 @@ add toroid or revolved wegde-shape lip so the lid can click into an aerosol-type
 
 """
 
-# sys has argv
-import sys
-import os
+if __name__ == "__main__":
+    import os
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
 from brlcad_tcl import *
-from brlcad_name_tracker import BrlcadNameTracker
 
 from motor_28BYJ_48__example import motor_28BYJ_48
 
 
 class aerosol_can_snap_cap(object):
-    def __init__(self, brl_db, name_tracker):
+    def __init__(self, brl_db):
         #cap_height = 40
-        self.get_next_name = name_tracker.get_next_name
+        self.get_next_name = brl_db.name_tracker.get_next_name
         self.brl_db = brl_db
 
         self.lower_rim_inner_diamater = 61.1 # may need to change to 61.0mm
@@ -77,13 +76,11 @@ class aerosol_can_snap_cap(object):
         self.brl_db.translate_relative("arb8.s", -100,0,0)
         '''
 
-def main(argv):
-    #with wdb.WDB(argv[1], "My Database") as brl_db:
-    with brlcad_tcl(argv[1], "My Database1") as brl_db:
-        name_tracker = BrlcadNameTracker()
-        
-        motor = motor_28BYJ_48(brl_db, name_tracker)
-        aerosol_can_cap = aerosol_can_snap_cap(brl_db, name_tracker)
+if __name__ == "__main__":
+    g_path_out = check_cmdline_args(__file__)
+    with brlcad_tcl(g_path_out, "My Database1") as brl_db:
+        motor = motor_28BYJ_48(brl_db)
+        aerosol_can_cap = aerosol_can_snap_cap(brl_db)
 
         brl_db.begin_combination_edit(motor.final_name, motor.center_name)
         brl_db.rotate_combination(180,0,0)
@@ -94,7 +91,3 @@ def main(argv):
     brl_db.save_g()
     # process the g database into an STL file with a list of regions
     brl_db.save_stl([motor.final_name, aerosol_can_cap.final_name])
-
-
-if __name__ == "__main__":
-    main(sys.argv)
