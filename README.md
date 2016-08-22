@@ -23,4 +23,14 @@ I was running this example then opening the resulting (.STL) file in meshlab (be
 * `python multi_part_example.py multi_part.tcl && meshlab multi_part.stl`
 
 ## Example of slicing a model and exporting to individual STL files:
+Looking at the stack of STL files emitted:
+
 ![Alt text](examples/output/microfluidic_pump/microfluidic_pump_slices_manually_created_animation.gif?raw=true "Animated GIF of the STL slices being shown and hidden")
+
+Looking at the raster output, with greyscale output option:
+
+![Alt text](examples/output/microfluidic_pump/microfluidic_pump_greyscale.gif?raw=true "")
+
+Looking at the raster output:
+
+![Alt text](examples/output/microfluidic_pump/microfluidic_pump_bw.gif?raw=true "")
