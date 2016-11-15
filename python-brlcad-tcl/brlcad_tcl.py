@@ -584,6 +584,17 @@ class brlcad_tcl():
             self.script_string += 'rot {} {} {}\n'.format(x, y, z)
         self.end_combination_edit()
 
+    def rotate_angle(self, name, x, y, z, angle, obj_type='primitive'):
+        if obj_type=='primitive':
+            self.script_string += 'Z\n'
+            self.script_string += 'draw {}\n'.format(name)
+            self.script_string += 'sed {}\n'.format(name)
+        else:
+            raise NotImplementedError('add non primitive editing start command')
+        self.script_string += 'arot {} {} {} {}\n'.format(x,y,z, angle)
+        self.script_string += 'accept\n'
+        # self.script_string += 'Z\n'
+
     def kill(self, name):
         if isinstance(name, list):
             for _name in name:
@@ -646,6 +657,11 @@ class brlcad_tcl():
 
     def arb6(self, name, v1, v2, v3, v4, v5, v6):
         is_string(name)
+        [is_truple(v) for v in [v1, v2, v3, v4, v5, v6]]
+        vs = [str(v) for xyz in [v1, v2, v3, v4, v5, v6] for v in xyz]
+        assert len(vs)==6*3
+        self.script_string += 'in {} arb6 {}\n'.format(name,
+                                                       ' '.join(vs))
 
     def arb7(self, name, v1, v2, v3, v4, v5, v6, v7):
         is_string(name)
