@@ -2,6 +2,8 @@
 import os
 import re
 import sys
+import math
+import inspect
 import numbers
 import datetime
 import subprocess
@@ -15,14 +17,14 @@ import numpy
 from PIL import Image
 
 # internal
-import vmath
-from brlcad_name_tracker import BrlcadNameTracker
+from . import vmath
+from .brlcad_name_tracker import BrlcadNameTracker
 
 
 def check_cmdline_args(file_path):
     if not len(sys.argv)==2:
-        print 'usage:\n'\
-              '      {} file_name_for_output'.format(file_path)
+        print('usage:\n'\
+              '      {} file_name_for_output'.format(file_path))
         sys.exit(1)
     return sys.argv[1]
 
@@ -52,7 +54,7 @@ def get_box_face_center_coord(corner1, corner2, xyz_desired):
 
 def is_truple(arg):
     is_numeric_truple = (isinstance(arg, tuple) or isinstance(arg, list)) and all([isinstance(x, numbers.Number) for x in arg])
-    assert(is_numeric_truple)
+    assert(is_numeric_truple), arg
 
 
 def is_number(arg):
@@ -81,7 +83,7 @@ def intersect(*args):
 
 
 class brlcad_tcl():
-    def __init__(self, tcl_filepath, title, make_g=False, make_stl=False, stl_quality=None, units='mm'):
+    def __init__(self, tcl_filepath, title, make_g=False, make_stl=False, stl_quality=None, units='mm', verbose=False):
         #if not os.path.isfile(self.output_filepath):
         #    abs_path = os.path.abspath(self.output_filepath)
         #    if not
@@ -90,12 +92,16 @@ class brlcad_tcl():
         self.g_path = None
         self.tcl_filepath = tcl_filepath
         self.stl_quality = stl_quality
-        self.now_path = os.path.splitext(self.tcl_filepath)[0]
+        self._input_file_path_no_ext = self._remove_file_extension(self.tcl_filepath)
 
         self.script_string = 'title {}\nunits {}\n'.format(title, units)
         self.units = units
         self.name_tracker = BrlcadNameTracker()
-        self.verbose = False
+        self.verbose = verbose
+
+    def _remove_file_extension(self, file_path):
+        return os.path.splitext(file_path)[0]
+    
 
     def __enter__(self):
         return self
@@ -117,16 +123,20 @@ class brlcad_tcl():
             f.write(self.script_string)
 
     def save_g(self):
-        self.g_path = self.now_path + '.g'
-        # try to remove a databse file of the same name if it exists
+        self.g_path = self._input_file_path_no_ext + '.g'
+        # try to remove a database file of the same name if it exists
         try:
             os.remove(self.g_path)
-        except:
-            pass
+        except Exception as e:
+            if not e.errno == 2:
+                print('WARNING: could not remove: {}\nuse different file name, or delete the file manually first!'.format(self.g_path))
+                raise (e)
+        
+        cmd = 'mged {} < {}'.format(self.g_path, self.tcl_filepath)
         if self.verbose:
-            proc = subprocess.Popen('mged {} < {}'.format(self.g_path, self.tcl_filepath), shell=True)
+            proc = subprocess.Popen(cmd, shell=True)
         else:
-            proc = subprocess.Popen('mged {} < {}'.format(self.g_path, self.tcl_filepath), shell=True,
+            proc = subprocess.Popen(cmd, shell=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         proc.communicate()
         
@@ -136,8 +146,11 @@ class brlcad_tcl():
         self.save_g()
         self.save_stl(objects_to_render)
 
-    def save_stl(self, objects_to_render):
-        stl_path = self.now_path + '.stl'
+    def save_stl(self, objects_to_render, output_path=None):
+        if output_path is None:
+            stl_path = self._input_file_path_no_ext + '.stl'
+        else:
+            stl_path = output_path if output_path.endswith('.stl') else '{}.stl'.format(output_path)
         obj_str = ' '.join(objects_to_render)
         cmd = 'g-stl -o {}'.format(stl_path)
 
@@ -169,14 +182,30 @@ class brlcad_tcl():
         # Add the paths
         cmd = '{} {} {}'.format(cmd, self.g_path, obj_str)
 
-        print 'running: {}'.format(cmd)
+        print('running: {}'.format(cmd))
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         proc.communicate()
+
+    def export_image_from_Z(self, item_name, width, height, output_path=None, azimuth=None, elevation=None):
+        if output_path is None:
+            output_path = '{}.png'.format(self._input_file_path_no_ext)
+        if azimuth is None:
+            azimuth = -90
+        if elevation is None:
+            elevation = -90
+        # on Linux, use 'man rt' on the command-line to get all the info... 
+        # (it is still not terribly straight-forward)
+        cmd = 'rt -a {} -e {} -w {} -n {} -o {} {} {}'\
+              .format(azimuth, elevation, width, height, output_path, self.g_path, item_name)
+        print('\nrunning: {}'.format(cmd))
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc.communicate()
+        return output_path
 
     def create_slice_regions(self, slice_thickness, max_slice_x, max_slice_y, output_format=''):
         tl_names = self.get_top_level_object_names()
         xyz1, xyz2 = self.get_opposing_corners_bounding_box(self.get_bounding_box_coords_for_entire_db(tl_names))
-        # print 'bb of all items {} to {}'.format(xyz1, xyz2)
+        #print 'bb of all items {} to {}'.format(xyz1, xyz2)
 
         if abs(xyz1[0] - xyz2[0]) > max_slice_x:
             raise Exception('x dimension exceeds buildable bounds')
@@ -188,17 +217,18 @@ class brlcad_tcl():
         temps_to_kill = []
 
         for i, object_slice_bb_coords in enumerate(slice_coords):
-            slice_bb_temp = self.name_tracker.get_next_name(self, 'slice_bb{}_num.s'.format(i))
+            # = self.name_tracker.get_next_name(self, 'slice_bb{}_num.s'.format(i))
+            slice_bb_temp = self.cuboid(object_slice_bb_coords[0], object_slice_bb_coords[1])
             temps_to_kill.append(slice_bb_temp)
-            self.cuboid(slice_bb_temp, object_slice_bb_coords[0], object_slice_bb_coords[1])
             # finally create a region (a special combination that means it's going to be rendered)
             # by unioning together the main combinations we just created
             tl_name_plussed = ' + '.join(tl_names)
-            slice_reg_name = self.name_tracker.get_next_name(self, 'slice{}_num.c'.format(i))
+            # slice_reg_name = self.name_tracker.get_next_name(self, 'slice{}_num.c'.format(i))
+            
+            slice_reg_name = self.region('slice{}_num.r'.format(i),
+                                              'u {} + {}'.format(slice_bb_temp, tl_name_plussed)
+                                              )
             temps_to_kill.append(slice_reg_name)
-            self.combination(slice_reg_name,
-                        'u {} + {}'.format(slice_bb_temp, tl_name_plussed)
-                        )
             self.slice_coords.append((slice_reg_name, object_slice_bb_coords))
         self.save_tcl()
         self.save_g()
@@ -218,6 +248,8 @@ class brlcad_tcl():
                                             num_pix_y=1024,
                                             output_greyscale=True,
                                             threading_event=None):
+        num_pix_x = math.ceil(num_pix_x)
+        num_pix_y = math.ceil(num_pix_y)
         # each 'bit' can be -1, 0, or 1
         x_bit, y_bit, z_bit = [int(b) for b in ray_destination_dir_xyz]
         # only one non-zero value can be provided
@@ -237,7 +269,7 @@ class brlcad_tcl():
         step_size = max(x_step, y_step)
         # the -s command might speed things up???
         args = ['nirt', '-s', self.g_path, slice_region_name]
-        print '\nrunning: {}'.format(' '.join(args))
+        print('\nrunning: {}'.format(' '.join(args)))
         p = subprocess.Popen(args,
                              stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
@@ -268,12 +300,12 @@ class brlcad_tcl():
                 y += step_size
                 ystepcount += 1
             # make sure we aren't going out-of-bounds
-            assert ystepcount <= num_pix_y, ystepcount
+            assert ystepcount <= num_pix_y, (ystepcount, num_pix_y)
             # step in X
             x += step_size
             xstepcount += 1
         # make sure we aren't going out-of-bounds
-        assert xstepcount <= num_pix_x, xstepcount
+        assert xstepcount <= num_pix_x, (xstepcount, num_pix_x)
 
         # pass the commands to NIRT, get NIRT's response
         outp = p.communicate('\n'.join(lins))
@@ -315,8 +347,8 @@ class brlcad_tcl():
                 chunks[-1]['Coords'].append(l)
                 m = r.search(l)
                 if not m:
-                    print 'first 10 lines out:\n{}'.format(out_lines[:10])
-                    print 'first err:\n{}'.format(err_lines[:1])
+                    print('first 10 lines out:\n{}'.format(out_lines[:10]))
+                    print('first err:\n{}'.format(err_lines[:1]))
                     raise Exception("regex didn't work to find coordinates! report this bug. on input line {}".format(l))
                 x, y, z, depth_of_hit = m.groups()
 
@@ -366,15 +398,15 @@ class brlcad_tcl():
         :param output_path_format:    a string with two {} that the g-database path and slice-num are inserted into
         :return:                      nothing
         """
-        orig_path = self.now_path
+        orig_path = self._input_file_path_no_ext
         orig_tcl = self.script_string
         self.save_tcl()
         self.save_g()
         # calculate the slice thickness needed to get the number of slices requested
         tl_names = self.get_top_level_object_names()
-        print 'top level names about to be exported: {}'.format(tl_names)
+        print('top level names about to be exported: {}'.format(tl_names))
         xyz1, xyz2 = self.get_opposing_corners_bounding_box(self.get_bounding_box_coords_for_entire_db(tl_names))
-        print 'top level items bounding-box: {} to {}'.format(xyz1, xyz2)
+        print('top level items bounding-box: {} to {}'.format(xyz1, xyz2))
 
         slice_thickness = abs(xyz2[2] - xyz1[2]) / float(num_slices_desired)
 
@@ -388,7 +420,7 @@ class brlcad_tcl():
                 if not output_path_format:
                     output_path_format='{}{}.jpg'
                 e = threading.Event()
-                output_filename = output_path_format.format(self.now_path, i)
+                output_filename = output_path_format.format(self._input_file_path_no_ext, i)
                 default_raster_kwargs = {'bmp_output_name': output_filename,
                                          'threading_event': e}
                 default_raster_kwargs.update(output_option_kwargs)
@@ -414,7 +446,7 @@ class brlcad_tcl():
                 if not output_path_format:
                     output_path_format = '{}{}'
 
-                self.now_path = output_path_format.format(orig_path, i)
+                self._input_file_path_no_ext = output_path_format.format(orig_path, i)
 
                 if i == 0:
                     self.run_and_save_stl([slice_obj_name])
@@ -434,7 +466,7 @@ class brlcad_tcl():
             self.script_string = orig_tcl
             self.save_tcl()
         elif output_format == 'stl':
-            self.now_path = orig_path
+            self._input_file_path_no_ext = orig_path
 
     @staticmethod
     def get_object_slice_coords(slice_thickness, xyz1, xyz2):
@@ -539,17 +571,28 @@ class brlcad_tcl():
 
     def combination(self, name, operation):
         is_string(name)
+        name = self._default_name_(name)
         self.script_string += 'comb {} {}\n'.format(name, operation)
+        return name
 
     def group(self, name, operation):
         is_string(name)
+        name = self._default_name_(name)
         self.script_string += 'g {} {}\n'.format(name, operation)
+        return name
 
     def region(self, name, operation):
         is_string(name)
+        name = self._default_name_(name)
         self.script_string += 'r {} {}\n'.format(name, operation)
+        return name
 
     def begin_combination_edit(self, combination_to_select, path_to_center):
+        if not path_to_center.endswith('.s'):
+            (frame, filename, line_number,
+                function_name, lines, index) = inspect.getouterframes(inspect.currentframe())[1]
+            print('WARNING: right-hand-side arg to begin_combination_edit does not have the .s file extension, which indicates a primitive may not have been passed! Watch out for errors!!!')
+            print('(in file: {}, line: {}, function-name: {})'.format(filename, line_number, function_name))
         self.script_string += 'Z\n'
         self.script_string += 'draw {}\n'.format(combination_to_select)
         self.script_string += 'oed / {0}/{1}\n'.format(combination_to_select, path_to_center)
@@ -561,6 +604,9 @@ class brlcad_tcl():
 
     def end_combination_edit(self):
         self.script_string += 'accept\n'
+
+    def remove_object_from_combination(self, combination, object_to_remove):
+        self.script_string += 'rm {} {}\n'.format(combination, object_to_remove)
 
     def translate(self, x, y, z, relative=False):
         cmd = 'translate'
@@ -602,7 +648,52 @@ class brlcad_tcl():
         else:
             self.script_string += 'kill {}\n'.format(name)
 
+    def _default_name_(self, name):
+        caller_func_name = inspect.stack()[1][3]
+        if name is None or name is '':
+            nname = self.name_tracker.get_next_name(self, '{}.s'.format(caller_func_name))
+            #print('_default_name_ generated: {}'.format(nname))
+        else:
+            nname = self.name_tracker.get_next_name(self, name)
+        return nname
+
+    def _check_name_unused_(self, name):
+        if name in self.name_tracker.num_parts_in_use_by_part_name:
+            (frame, filename, line_number,
+                function_name, lines, index) = inspect.getouterframes(inspect.currentframe())[1]
+            raise Exception('name: {} already used! (in file: {}, line: {}, function-name: {})'.format(name, filename, line_number, function_name))
+    
+    def tgc(self, name, base, height,
+            ellipse_base_radius_part_A, ellipse_base_radius_part_B,
+            top_radius_scaling_A, top_radius_scaling_B):
+        name = self._default_name_(name)
+        is_string(name)
+        is_truple(base)
+        is_truple(height)
+        is_truple(ellipse_base_radius_part_A)
+        is_truple(ellipse_base_radius_part_B)
+        is_number(top_radius_scaling_A)
+        is_number(top_radius_scaling_B)
+        
+        basex, basey, basez = base
+        hx, hy, hz = height
+        ax, ay, az = ellipse_base_radius_part_A
+        bx, by, bz = ellipse_base_radius_part_B
+        self.script_string += 'in {} tgc {} {} {} '\
+                                       ' {} {} {}'\
+                                       ' {} {} {}'\
+                                       ' {} {} {}'\
+                                       ' {} {}\n'.format(name,
+                                                         basex, basey, basez,
+                                                         hx, hy, hz,
+                                                         ax, ay, az,
+                                                         bx, by, bz,
+                                                         top_radius_scaling_A,
+                                                         top_radius_scaling_B)
+        return name
+
     def rcc(self, name, base, height, radius):
+        name = self._default_name_(name)
         is_string(name)
         is_truple(base)
         is_truple(height)
@@ -613,8 +704,10 @@ class brlcad_tcl():
                                                                         bx, by, bz,
                                                                         hx, hy, hz,
                                                                         radius)
+        return name
 
     def rpc(self, name, vertex, height_vector, base_vector, half_width):
+        name = self._default_name_(name)
         is_string(name)
         is_truple(vertex)
         is_truple(height_vector)
@@ -628,14 +721,16 @@ class brlcad_tcl():
                                                                                  hx,hy,hz,
                                                                                  bx,by,bz,
                                                                                  half_width)
+        return name
 
     def box_by_opposite_corners(self, name, pmin, pmax):
-        self.rpp(self, name, pmin, pmax)
+        return self.rpp(self, name, pmin, pmax)
 
     def circular_cylinder(self, name, base_center_point, top_center_point, radius):
-        self.rcc(name, base_center_point, top_center_point, radius)
+        return self.rcc(name, base_center_point, top_center_point, radius)
 
     def rpp(self, name, pmin, pmax):
+        name = self._default_name_(name)
         is_string(name)
         is_truple(pmin)
         is_truple(pmax)
@@ -645,28 +740,39 @@ class brlcad_tcl():
                                                                      minx,maxx,
                                                                      miny,maxy,
                                                                      minz,maxz)
+        return name
 
-    def cuboid(self, name, corner_point, opposing_corner_point):
-        self.rpp(name, corner_point, opposing_corner_point)
+    def cuboid(self, corner_point, opposing_corner_point, name=None):
+        return self.rpp(name, corner_point, opposing_corner_point)
 
     def arb4(self, name, v1, v2, v3, v4):
         is_string(name)
+        name = self._default_name_(name)
+
+        return name
 
     def arb5(self, name, v1, v2, v3, v4, v5):
         is_string(name)
+        name = self._default_name_(name)
+        
+        return name
 
     def arb6(self, name, v1, v2, v3, v4, v5, v6):
         is_string(name)
+        name = self._default_name_(name)
         [is_truple(v) for v in [v1, v2, v3, v4, v5, v6]]
         vs = [str(v) for xyz in [v1, v2, v3, v4, v5, v6] for v in xyz]
         assert len(vs)==6*3
         self.script_string += 'in {} arb6 {}\n'.format(name,
                                                        ' '.join(vs))
+        return name
 
     def arb7(self, name, v1, v2, v3, v4, v5, v6, v7):
         is_string(name)
+        name = self._default_name_(name)
 
     def arb8(self, name, points):
+        name = self._default_name_(name)
         is_string(name)
         check_args = [is_truple(x) for x in points]
         assert(len(points)==8)
@@ -677,6 +783,7 @@ class brlcad_tcl():
         self.script_string += 'in {} arb8 {} \n'.format(name,
                                                         points_list
                                                         )
+        return name
                                                         
     def arbX(self, name, vList):
         #Detect which function to use, and feed in the parameters
@@ -692,11 +799,11 @@ class brlcad_tcl():
     def Cone_elliptical(self, name, tec, vertex, height_vector, major_axis, minor_axis, ratio):
         is_string(name)
 
-    def Cone_general(self, name, tgc, vertex, height_vector, avector, bvector, cscalar, dscalar):
-        is_string(name)
+    def cone_general(self, name, vertex, height_vector, avector, bvector, cscalar, dscalar):
+        return self.tgc(name, vertex, height_vector, avector, bvector, cscalar, dscalar)
 
-    def Cylinder(self, name, vertex, height_vector, radius):
-        self.rcc(name, vertex, height_vector, radius)
+    def cylinder(self, name, vertex, height_vector, radius):
+        return self.rcc(name, vertex, height_vector, radius)
 
     def Cylinder_elliptical(self, name, rec, vertex, height_vector, major_axis, minor_axis):
         is_string(name)
@@ -722,8 +829,16 @@ class brlcad_tcl():
     def Particle(self, name, part, vertex, height_vector, radius_at_v_end, radius_at_h_end):
         is_string(name)
 
-    def Sphere(self, name, sph, vertex, radius):
-        is_string(name)
+    def sph(self, name, vertex, radius):
+        name = self._default_name_(name)
+        is_truple(vertex)
+        is_number(radius)
+        x, y, z = vertex
+        self.script_string += 'in {} sph {} {} {} {}'.format(name, x, y, z, radius)
+        return name
+
+    def Sphere(self, name, vertex, radius):
+        return self.sph(name, vertex, radius)
 
     def Torus(self, name, tor, vertex, normal, radius_1, radius_2):
         is_string(name)

@@ -19,7 +19,7 @@ class BrlcadNameTracker(object):
             # if the key wasn't yet requested, start counting now
             self.num_parts_in_use_by_part_name[part_name]=1
         name_split = part_name.split('.')
-        name_prefix = '.'.join(name_split[:-1])
+        name_prefix = '.'.join(name_split[:-1]) if len(name_split)>1 else name_split[-1]
         name_suffix = '.'+name_split[-1] if len(name_split)>1 else ''
         
         return '{}{}{}'.format(name_prefix, self.num_parts_in_use_by_part_name[part_name], name_suffix)
