@@ -9,30 +9,27 @@ import os
 from math import atan
 from math import degrees
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
-
-from brlcad_tcl import *
-from brlcad_name_tracker import BrlcadNameTracker
+from python_brlcad_tcl.brlcad_tcl import *
 
 
 class shed_example(BrlCadModel):
-    def __init__(self, brl_db, name_tracker):
-        super(shed_example, self). __init__(brl_db, name_tracker)
+    def __init__(self, brl_db):
+        super(shed_example, self). __init__(brl_db)
         ceiling = 10
         peak = 15
         wall_thickness = 0.2
 
         c1 = [0, 0, 0]
         c2 = [16, 12, ceiling]
-        brl_db.cuboid('shedbox', c1, c2)
+        brl_db.cuboid(c1, c2, 'shedbox')
         
         c1 = [0+wall_thickness, 0+wall_thickness, 0+wall_thickness]
         c2 = [16-wall_thickness, 12-wall_thickness, ceiling+wall_thickness]
-        brl_db.cuboid('room_void', c1, c2)
+        brl_db.cuboid(c1, c2, 'room_void')
 
         c1 = [0, 5, ceiling - wall_thickness]
         c2 = [16, 12, ceiling]
-        brl_db.cuboid('loft', c1, c2)
+        brl_db.cuboid(c1, c2, 'loft')
 
         
 
@@ -64,7 +61,7 @@ class shed_example(BrlCadModel):
         def box_window(name,x,y,z,w,h,d, rot_axis=None, degrees=None):
             c1 = [x-(w/2),y-(d/2),z-(h/2)]
             c2 = [x+(w/2),y+(d/2),z+(h/2)]
-            brl_db.cuboid(name, c1, c2)
+            brl_db.cuboid(c1, c2, name)
             if rot_axis is not None:
                 xx = 1 if rot_axis=='x' else 0
                 yy = 1 if rot_axis=='y' else 0
@@ -75,7 +72,7 @@ class shed_example(BrlCadModel):
         def french_door(name,x,y,z,w,h,d,rot):
             c1 = [x-w/2,y-d/2,z-h/2]
             c2 = [x+w/2,y+d/2,z+h/2]
-            brl_db.cuboid(name, c1, c2)
+            brl_db.cuboid(c1, c2, name)
 
         o = peak - ceiling
         a = 6
@@ -104,8 +101,7 @@ class shed_example(BrlCadModel):
 def main(argv):
     #with wdb.WDB(argv[1], "My Database") as brl_db:
     with brlcad_tcl(argv[1], "My Database") as brl_db:
-        name_tracker = BrlcadNameTracker()
-        shed = shed_example(brl_db, name_tracker)
+        shed = shed_example(brl_db)
         # All units in the database file are stored in millimeters. This constrains
         # the arguments to the mk_* routines to also be in millimeters.
     # process the tcl script into a g database by calling mged

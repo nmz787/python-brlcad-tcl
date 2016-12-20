@@ -94,7 +94,7 @@ class brlcad_tcl():
         self.stl_quality = stl_quality
         self._input_file_path_no_ext = self._remove_file_extension(self.tcl_filepath)
 
-        self.script_string = 'title {}\nunits {}\n'.format(title, units)
+        self.script_string_list = ['title {}\nunits {}\n'.format(title, units)]
         self.units = units
         self.name_tracker = BrlcadNameTracker()
         self.verbose = verbose
@@ -116,11 +116,11 @@ class brlcad_tcl():
             
     def add_script_string(self, to_add):
         # In case the user does some adding on their own
-        self.script_string += '\n' + str(to_add) + '\n'
+        self.script_string_list.append( '\n' + str(to_add) + '\n')
 
     def save_tcl(self):
         with open(self.tcl_filepath, 'w') as f:
-            f.write(self.script_string)
+            f.write(''.join(self.script_string_list))
 
     def save_g(self):
         self.g_path = self._input_file_path_no_ext + '.g'
@@ -399,7 +399,7 @@ class brlcad_tcl():
         :return:                      nothing
         """
         orig_path = self._input_file_path_no_ext
-        orig_tcl = self.script_string
+        orig_tcl = self.script_string_list
         self.save_tcl()
         self.save_g()
         # calculate the slice thickness needed to get the number of slices requested
@@ -457,13 +457,13 @@ class brlcad_tcl():
         if output_format == 'raster':
             while threads:
                 threads.pop(0).join()
-            self.script_string = ''
+            self.script_string_list = []
             # get rid of the slices, so they don't show up as top-level objects if user exports slices again
             # destroy the objects in the reverse order of how they were created
             # [self.kill(temp_bb) for temp_bb in reversed(temps_to_kill)]
             # self.save_tcl()
             # self.save_g()
-            self.script_string = orig_tcl
+            self.script_string_list = orig_tcl
             self.save_tcl()
         elif output_format == 'stl':
             self._input_file_path_no_ext = orig_path
@@ -577,24 +577,24 @@ class brlcad_tcl():
 
     def set_combination_color(self, obj_name, R, G, B):
         is_string(obj_name)
-        self.script_string += 'comb_color {} {} {} {}'.format(obj_name, R, G, B)
+        self.script_string_list.append( 'comb_color {} {} {} {}'.format(obj_name, R, G, B))
 
     def combination(self, name, operation):
         is_string(name)
         name = self._default_name_(name)
-        self.script_string += 'comb {} {}\n'.format(name, operation)
+        self.script_string_list.append( 'comb {} {}\n'.format(name, operation))
         return name
 
     def group(self, name, operation):
         is_string(name)
         name = self._default_name_(name)
-        self.script_string += 'g {} {}\n'.format(name, operation)
+        self.script_string_list.append( 'g {} {}\n'.format(name, operation))
         return name
 
     def region(self, name, operation):
         is_string(name)
         name = self._default_name_(name)
-        self.script_string += 'r {} {}\n'.format(name, operation)
+        self.script_string_list.append( 'r {} {}\n'.format(name, operation))
         return name
 
     def begin_combination_edit(self, combination_to_select, path_to_center):
@@ -603,60 +603,60 @@ class brlcad_tcl():
                 function_name, lines, index) = inspect.getouterframes(inspect.currentframe())[1]
             print('WARNING: right-hand-side arg to begin_combination_edit does not have the .s file extension, which indicates a primitive may not have been passed! Watch out for errors!!!')
             print('(in file: {}, line: {}, function-name: {})'.format(filename, line_number, function_name))
-        self.script_string += 'Z\n'
-        self.script_string += 'draw {}\n'.format(combination_to_select)
-        self.script_string += 'oed / {0}/{1}\n'.format(combination_to_select, path_to_center)
+        self.script_string_list.append( 'Z\n')
+        self.script_string_list.append( 'draw {}\n'.format(combination_to_select))
+        self.script_string_list.append( 'oed / {0}/{1}\n'.format(combination_to_select, path_to_center))
 
     def begin_primitive_edit(self, name):
-        #self.script_string += 'Z\n'
-        #self.script_string += 'draw {}\n'.format(name)
-        self.script_string += 'sed {0}\n'.format(name)
+        #self.script_string_list.append( 'Z\n')
+        #self.script_string_list.append( 'draw {}\n'.format(name))
+        self.script_string_list.append( 'sed {0}\n'.format(name))
 
     def end_combination_edit(self):
-        self.script_string += 'accept\n'
+        self.script_string_list.append( 'accept\n')
 
     def remove_object_from_combination(self, combination, object_to_remove):
-        self.script_string += 'rm {} {}\n'.format(combination, object_to_remove)
+        self.script_string_list.append( 'rm {} {}\n'.format(combination, object_to_remove))
 
     def translate(self, x, y, z, relative=False):
         cmd = 'translate'
         if relative:
             cmd = 'tra'
-        self.script_string += '{} {} {} {}\n'.format(cmd, x, y, z)
+        self.script_string_list.append( '{} {} {} {}\n'.format(cmd, x, y, z))
 
     def translate_relative(self, dx, dy, dz):
         self.translate(dx, dy, dz, relative=True)
 
     def rotate_combination(self, x, y, z):
-        self.script_string += 'orot {} {} {}\n'.format(x, y, z)
+        self.script_string_list.append( 'orot {} {} {}\n'.format(x, y, z))
 
     def rotate_primitive(self, name, x, y, z, angle=None):
         is_string(name)
         self.begin_primitive_edit(name)
-        self.script_string += 'keypoint {} {} {}\n'.format(x, y, z)
+        self.script_string_list.append( 'keypoint {} {} {}\n'.format(x, y, z))
         if angle:
-            self.script_string += 'arot {} {} {} {}\n'.format(x, y, z, angle)
+            self.script_string_list.append( 'arot {} {} {} {}\n'.format(x, y, z, angle))
         else:
-            self.script_string += 'rot {} {} {}\n'.format(x, y, z)
+            self.script_string_list.append( 'rot {} {} {}\n'.format(x, y, z))
         self.end_combination_edit()
 
     def rotate_angle(self, name, x, y, z, angle, obj_type='primitive'):
         if obj_type=='primitive':
-            self.script_string += 'Z\n'
-            self.script_string += 'draw {}\n'.format(name)
-            self.script_string += 'sed {}\n'.format(name)
+            self.script_string_list.append( 'Z\n')
+            self.script_string_list.append( 'draw {}\n'.format(name))
+            self.script_string_list.append( 'sed {}\n'.format(name))
         else:
             raise NotImplementedError('add non primitive editing start command')
-        self.script_string += 'arot {} {} {} {}\n'.format(x,y,z, angle)
-        self.script_string += 'accept\n'
-        # self.script_string += 'Z\n'
+        self.script_string_list.append( 'arot {} {} {} {}\n'.format(x,y,z, angle))
+        self.script_string_list.append( 'accept\n')
+        # self.script_string_list.append( 'Z\n')
 
     def kill(self, name):
         if isinstance(name, list):
             for _name in name:
-                self.script_string += 'kill {}\n'.format(_name)
+                self.script_string_list.append( 'kill {}\n'.format(_name))
         else:
-            self.script_string += 'kill {}\n'.format(name)
+            self.script_string_list.append( 'kill {}\n'.format(name))
 
     def _default_name_(self, name):
         caller_func_name = inspect.stack()[1][3]
@@ -664,6 +664,9 @@ class brlcad_tcl():
             nname = self.name_tracker.get_next_name(self, '{}.s'.format(caller_func_name))
             #print('_default_name_ generated: {}'.format(nname))
         else:
+            if name not in self.name_tracker.num_parts_in_use_by_part_name:
+                self.name_tracker.increment_counter_for_name(name)
+                return name
             nname = self.name_tracker.get_next_name(self, name)
         return nname
 
@@ -689,7 +692,7 @@ class brlcad_tcl():
         hx, hy, hz = height
         ax, ay, az = ellipse_base_radius_part_A
         bx, by, bz = ellipse_base_radius_part_B
-        self.script_string += 'in {} tgc {} {} {} '\
+        self.script_string_list.append( 'in {} tgc {} {} {} '\
                                        ' {} {} {}'\
                                        ' {} {} {}'\
                                        ' {} {} {}'\
@@ -699,7 +702,7 @@ class brlcad_tcl():
                                                          ax, ay, az,
                                                          bx, by, bz,
                                                          top_radius_scaling_A,
-                                                         top_radius_scaling_B)
+                                                         top_radius_scaling_B))
         return name
 
     def rcc(self, name, base, height, radius):
@@ -710,10 +713,9 @@ class brlcad_tcl():
         is_number(radius)
         bx, by, bz = base
         hx, hy, hz = height
-        self.script_string += 'in {} rcc {} {} {} {} {} {} {}\n'.format(name,
-                                                                        bx, by, bz,
-                                                                        hx, hy, hz,
-                                                                        radius)
+        self.script_string_list.append('in {} rcc {} {} {} {} {} {} {}\n'
+                                       .format(name, bx, by, bz, hx, hy, hz,
+                                               radius))
         return name
 
     def rpc(self, name, vertex, height_vector, base_vector, half_width):
@@ -726,11 +728,12 @@ class brlcad_tcl():
         vx, vy, vz = vertex
         hx, hy, hz = height_vector
         bx, by, bz = base_vector
-        self.script_string += 'in {} rpc {} {} {} {} {} {} {} {} {} {}\n'.format(name,
-                                                                                 vx,vy,vz,
-                                                                                 hx,hy,hz,
-                                                                                 bx,by,bz,
-                                                                                 half_width)
+        self.script_string_list.append('in {} rpc {} {} {} {} {} {} {} {} {} {}\n'
+                                       .format(name,
+                                               vx,vy,vz,
+                                               hx,hy,hz,
+                                               bx,by,bz,
+                                               half_width))
         return name
 
     def box_by_opposite_corners(self, name, pmin, pmax):
@@ -746,10 +749,10 @@ class brlcad_tcl():
         is_truple(pmax)
         minx,miny,minz = pmin
         maxx,maxy,maxz = pmax
-        self.script_string += 'in {} rpp {} {} {} {} {} {}\n'.format(name,
+        self.script_string_list.append( 'in {} rpp {} {} {} {} {} {}\n'.format(name,
                                                                      minx,maxx,
                                                                      miny,maxy,
-                                                                     minz,maxz)
+                                                                     minz,maxz))
         return name
 
     def cuboid(self, corner_point, opposing_corner_point, name=None):
@@ -773,8 +776,8 @@ class brlcad_tcl():
         [is_truple(v) for v in [v1, v2, v3, v4, v5, v6]]
         vs = [str(v) for xyz in [v1, v2, v3, v4, v5, v6] for v in xyz]
         assert len(vs)==6*3
-        self.script_string += 'in {} arb6 {}\n'.format(name,
-                                                       ' '.join(vs))
+        self.script_string_list.append( 'in {} arb6 {}\n'.format(name,
+                                                       ' '.join(vs)))
         return name
 
     def arb7(self, name, v1, v2, v3, v4, v5, v6, v7):
@@ -790,9 +793,9 @@ class brlcad_tcl():
         
         #print 'arb8 points list: {}\n\n{}'.format(points, points_list)
         
-        self.script_string += 'in {} arb8 {} \n'.format(name,
+        self.script_string_list.append( 'in {} arb8 {} \n'.format(name,
                                                         points_list
-                                                        )
+                                                        ))
         return name
                                                         
     def arbX(self, name, vList):
@@ -844,7 +847,7 @@ class brlcad_tcl():
         is_truple(vertex)
         is_number(radius)
         x, y, z = vertex
-        self.script_string += 'in {} sph {} {} {} {}'.format(name, x, y, z, radius)
+        self.script_string_list.append( 'in {} sph {} {} {} {}'.format(name, x, y, z, radius))
         return name
 
     def Sphere(self, name, vertex, radius):
@@ -878,7 +881,7 @@ class brlcad_tcl():
         elif isinstance(pipe_points[0][0], vmath.vector.Vector):
             def rotate_tuple(x): d = deque(list(x)); d.rotate(2); return d
             points_str_list = ['{} {} {} {} {} {}'.format(*(list(points[0]) + list(rotate_tuple(points[1:]))) ) for points in pipe_points]
-        self.script_string += 'in {} pipe {} {}\n'.format(name, num_points, ' '.join(points_str_list))
+        self.script_string_list.append( 'in {} pipe {} {}\n'.format(name, num_points, ' '.join(points_str_list)))
         """ # this worked for me as a spring
         in spring.s pipe 10 -500 -500 250 10 200 500 -500 500 350 100 200 500 500 500 450 100 200 500 500 -500 550 100 200 500 -500 -500 650 100 200 500 -500 500 750 100 200 500 500 500 850 100 200 500 500 -500 950 100 200 500 -500 -500 1050 100 200 500 -500 500 1150 100 200 500 0 500 1200 100 200 500
         r s.r u spring.s

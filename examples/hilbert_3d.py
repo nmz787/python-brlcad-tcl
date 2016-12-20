@@ -12,9 +12,8 @@ python hilbert_3d.py
 import sys
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
-from brlcad_tcl import *
-from vmath.vector import Vector
+from python_brlcad_tcl.brlcad_tcl import *
+from python_brlcad_tcl.vmath.vector import Vector
 
 
 XP = (1, 0, 0)

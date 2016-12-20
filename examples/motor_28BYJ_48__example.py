@@ -12,12 +12,7 @@ Add the shaft, maybe screw helices (if present on actual motor)
 
 """
 
-if __name__ == "__main__":
-    import os
-    import sys
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
-
-from brlcad_tcl import *
+from python_brlcad_tcl.brlcad_tcl import *
 
 
 class motor_28BYJ_48():
@@ -266,7 +261,8 @@ class motor_28BYJ_48():
 if __name__ == "__main__":
     #with wdb.WDB(argv[1], "My Database") as brl_db:
     g_path_out = check_cmdline_args(__file__)
-    with brlcad_tcl(g_path_out, "My Database") as brl_db:
+    with brlcad_tcl(g_path_out, "My Database", make_g=True) as brl_db:
         motor = motor_28BYJ_48(brl_db)
         # All units in the database file are stored in millimeters. This constrains
         # the arguments to the mk_* routines to also be in millimeters.
+    brl_db.save_stl([motor.final_name])

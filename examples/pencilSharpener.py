@@ -2,9 +2,9 @@
 import os, sys
 
 #Import sister module.
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
-from brlcad_tcl import *
-import toothGen
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
+from python_brlcad_tcl.brlcad_tcl import *
+from examples import toothGen
 
 #Some constants
 endl = '\n'

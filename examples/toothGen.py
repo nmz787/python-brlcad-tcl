@@ -1,9 +1,7 @@
 #Imports
-import os, sys
+import os
 
-#Import sister module.
-sys.path.append('../python-brlcad-tcl')
-import brlcad_tcl as brl
+import python_brlcad_tcl.brlcad_tcl as brl
 
 #Some constants
 endl = '\n'

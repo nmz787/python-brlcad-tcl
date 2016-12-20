@@ -12,14 +12,9 @@ add toroid or revolved wegde-shape lip so the lid can click into an aerosol-type
 
 """
 
-if __name__ == "__main__":
-    import os
-    import sys
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
+from python_brlcad_tcl.brlcad_tcl import *
 
-from brlcad_tcl import *
-
-from motor_28BYJ_48__example import motor_28BYJ_48
+from examples.motor_28BYJ_48__example import motor_28BYJ_48
 
 
 class aerosol_can_snap_cap(object):

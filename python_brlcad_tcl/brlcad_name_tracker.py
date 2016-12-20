@@ -13,13 +13,16 @@ class BrlcadNameTracker(object):
         # get the next instance number for the requested part 
         # TODO: should there be a remove part method, which decrements the key's value?
         # you can remove objects from the brlcad geometry database...
-        try:
-            self.num_parts_in_use_by_part_name[part_name]+=1
-        except KeyError:
-            # if the key wasn't yet requested, start counting now
-            self.num_parts_in_use_by_part_name[part_name]=1
+        self.increment_counter_for_name(part_name)
         name_split = part_name.split('.')
         name_prefix = '.'.join(name_split[:-1]) if len(name_split)>1 else name_split[-1]
         name_suffix = '.'+name_split[-1] if len(name_split)>1 else ''
         
         return '{}{}{}'.format(name_prefix, self.num_parts_in_use_by_part_name[part_name], name_suffix)
+
+    def increment_counter_for_name(self, part_name):
+        try:
+            self.num_parts_in_use_by_part_name[part_name]+=1
+        except KeyError:
+            # if the key wasn't yet requested, start counting now
+            self.num_parts_in_use_by_part_name[part_name]=1

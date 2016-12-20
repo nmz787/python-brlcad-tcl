@@ -7,12 +7,7 @@ Run with:
 python spring.py spring.tcl
 """
 
-if __name__ == "__main__":
-    import os
-    import sys
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
-
-from brlcad_tcl import *
+from python_brlcad_tcl.brlcad_tcl import *
 
         
 if __name__ == "__main__":

@@ -1,9 +1,4 @@
-if __name__ == "__main__":
-    import os
-    import sys
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python-brlcad-tcl')))
-
-from brlcad_tcl import *
+from python_brlcad_tcl.brlcad_tcl import *
 
 
 class peristaltic_3_finger_pump(BrlCadModel):
@@ -31,7 +26,7 @@ class peristaltic_3_finger_pump(BrlCadModel):
         self.f1 = self.get_next_name(self, "f1.s")
         c1 = [0, 0, 0]
         c2 = [self.width, self.length, self.depth]
-        brl_db.cuboid(self.f1, c1, c2)
+        brl_db.cuboid(c1, c2, self.f1)
         self.register_new_connection_point('flow_control_a_coord',
                                            *get_box_face_center_coord(c1, c2,
                                                                       xyz_desired=[0,-1,0]))
@@ -39,7 +34,7 @@ class peristaltic_3_finger_pump(BrlCadModel):
         self.f2 = self.get_next_name(self, "f2.s")
         c1[0] += self.finger_pitch
         c2[0] += self.finger_pitch
-        brl_db.cuboid(self.f2, c1, c2)
+        brl_db.cuboid(c1, c2, self.f2)
         self.register_new_connection_point('flow_control_b_coord',
                                            *get_box_face_center_coord(c1, c2,
                                                                       xyz_desired=[0,-1,0]))
@@ -47,7 +42,7 @@ class peristaltic_3_finger_pump(BrlCadModel):
         self.f3 = self.get_next_name(self, "f3.s")
         c1[0] += self.finger_pitch
         c2[0] += self.finger_pitch
-        brl_db.cuboid(self.f3, c1, c2)
+        brl_db.cuboid(c1, c2, self.f3)
         self.register_new_connection_point('flow_control_c_coord',
                                            *get_box_face_center_coord(c1, c2,
                                                                       xyz_desired=[0,-1,0]))
@@ -63,7 +58,7 @@ class peristaltic_3_finger_pump(BrlCadModel):
         c4 = [c2[0] + self.flow_tube_stub_length,
               (c2[1]/2)+self.flow_tube_width/2,
               0]
-        brl_db.cuboid(self.flowtube, c3, c4)
+        brl_db.cuboid(c3, c4, self.flowtube)
         self.register_new_connection_point('flow_in',
                                            *get_box_face_center_coord(c3, c4,
                                                                       xyz_desired=[-1,0,0]))
