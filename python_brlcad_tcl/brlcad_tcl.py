@@ -513,7 +513,7 @@ class brlcad_tcl():
         part_names = ' '.join(name_list)
         return self.get_bounding_box_coords(part_names)
 
-    def get_bounding_box_coords(self, obj_name):
+    def get_bounding_box_coords(self, obj_name, mged_post_7_26=False, auto_retry=True):
         """
         The "l" command displays a verbose description about the specified list of objects.
         If a specified object is a path, then any transformation matrices along that path are applied.
@@ -527,13 +527,23 @@ class brlcad_tcl():
         down to individual shapes will be considered. The shape at the end of each possible path will be 
         listed with its parameters adjusted by the accumulated transformation.
         """
-        proc = subprocess.Popen('mged {} "make_bb temp_box {}; l temp_box"'.format(self.g_path, obj_name),
+        if not mged_post_7_26:
+            make_bb_cmd = 'make_bb'
+        else:
+            make_bb_cmd = 'bb -c'
+        args = 'mged {} "{} temp_box {}; l temp_box"'.format(self.g_path, make_bb_cmd, obj_name)
+        proc = subprocess.Popen(args,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 shell=True)
         
         (stdoutdata, stderrdata) = proc.communicate()
-        # print (stdoutdata, stderrdata)
+        if auto_retry and 'invalid command name "make_bb"' in stderrdata:
+            if self.verbose:
+                print('retrying this command (obj_name: {}), as stderr returned: {}'.format(obj_name, stderrdata))
+            return self.get_bounding_box_coords(obj_name, not mged_post_7_26, auto_retry=False)
+        elif self.verbose:
+            print (stdoutdata, stderrdata)
         subprocess.Popen('mged {} "kill temp_box"'.format(self.g_path), shell=True).communicate()
 
         bb_coords = []
