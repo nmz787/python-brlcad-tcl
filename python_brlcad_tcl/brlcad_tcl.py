@@ -119,26 +119,51 @@ class brlcad_tcl():
         self.script_string_list.append( '\n' + str(to_add) + '\n')
 
     def save_tcl(self):
+        for line in self.script_string_list:
+            if not line.endswith('\n'):
+                raise Exception("line ({}) didn't end with a \\n".format(line))
         with open(self.tcl_filepath, 'w') as f:
             f.write(''.join(self.script_string_list))
+
+    def _which(self, program):
+        def is_exe(fpath):
+            return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+        fpath, fname = os.path.split(program)
+        if fpath:
+            if is_exe(program):
+                return program
+        else:
+            for path in os.environ["PATH"].split(os.pathsep):
+                path = path.strip('"')
+                exe_file = os.path.join(path, program)
+                if is_exe(exe_file):
+                    return exe_file
 
     def save_g(self):
         self.g_path = self._input_file_path_no_ext + '.g'
         # try to remove a database file of the same name if it exists
         try:
             os.remove(self.g_path)
+            print('removed {}?: {}'.format(self.g_path, os.path.isfile(self.g_path)))
         except Exception as e:
             if not e.errno == 2:
                 print('WARNING: could not remove: {}\nuse different file name, or delete the file manually first!'.format(self.g_path))
                 raise (e)
         
         cmd = 'mged {} < {}'.format(self.g_path, self.tcl_filepath)
+        cmd = [self._which('mged'), self.g_path]
+        print('running mged with command: {}'.format(cmd))
+        #proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+
         if self.verbose:
-            proc = subprocess.Popen(cmd, shell=True)
+            proc = subprocess.Popen(cmd, shell=False, stdin=subprocess.PIPE)
         else:
-            proc = subprocess.Popen(cmd, shell=True,
+            proc = subprocess.Popen(cmd, shell=False, stdin=subprocess.PIPE,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        proc.communicate()
+        proc.communicate(''.join(self.script_string_list))
+        #proc.communicate(['opendb {}\n'.format(self.g_path)] + self.script_string_list)
+        #proc.communicate()
         
     def run_and_save_stl(self, objects_to_render):
         # Do all of them in one go
@@ -177,7 +202,7 @@ class brlcad_tcl():
         """
 
         if self.stl_quality and self.stl_quality > 0:
-            cmd = '{} -a {}'.format(cmd, self.stl_quality)
+            cmd = '{} -n {}'.format(cmd, self.stl_quality)
 
         # Add the paths
         cmd = '{} {} {}'.format(cmd, self.g_path, obj_str)
@@ -193,9 +218,14 @@ class brlcad_tcl():
             azimuth = -90
         if elevation is None:
             elevation = -90
+
+        try:
+            os.remove(output_path)
+        except:
+            pass
         # on Linux, use 'man rt' on the command-line to get all the info... 
         # (it is still not terribly straight-forward)
-        cmd = 'rt -a {} -e {} -w {} -n {} -o {} {} {}'\
+        cmd = 'rt -a {} -l3 -e {} -w {} -n {} -o {} {} {}'\
               .format(azimuth, elevation, width, height, output_path, self.g_path, item_name)
         print('\nrunning: {}'.format(cmd))
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -208,7 +238,7 @@ class brlcad_tcl():
         #print 'bb of all items {} to {}'.format(xyz1, xyz2)
 
         if abs(xyz1[0] - xyz2[0]) > max_slice_x:
-            raise Exception('x dimension exceeds buildable bounds')
+            raise Exception('x dimension exceeds buildable bounds {} {} {}'.format(xyz1[0], xyz2[0], max_slice_x))
         if abs(xyz1[1] - xyz2[1]) > max_slice_y:
             raise Exception('y dimension exceeds buildable bounds')
 
@@ -267,20 +297,17 @@ class brlcad_tcl():
         y_step = model_length/num_pix_y
 
         step_size = max(x_step, y_step)
-        # the -s command might speed things up???
-        args = ['nirt', '-s', self.g_path, slice_region_name]
-        print('\nrunning: {}'.format(' '.join(args)))
-        p = subprocess.Popen(args,
-                             stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+        
+        
         if threading_event:
             threading_event.set()
         # create a list for the NIRT command lines to be queued
-        lins=[]
+        nirt_script_path = '{}.nirt'.format(self._input_file_path_no_ext)
+        nirt_script_file = open(nirt_script_path, 'w')
+
         # set the direction to fire rays in
-        lins.append('dir {} {} {}'.format(x_bit, y_bit, z_bit))
-        lins.append('units {}'.format(self.units))
+        nirt_script_file.write('dir {} {} {}\n'.format(x_bit, y_bit, z_bit))
+        nirt_script_file.write('units {}\n'.format(self.units))
         x = model_min[0]
         z = model_max[2]
 
@@ -293,9 +320,9 @@ class brlcad_tcl():
             # loop while Y is less than the model's max Y
             while y < model_max[1]:
                 # move around the model in X and Y axes, using the determined step-size
-                lins.append('xyz {} {} {}'.format(x, y, z))
+                nirt_script_file.write('xyz {} {} {}\n'.format(x, y, z))
                 # fire a ray
-                lins.append('s')
+                nirt_script_file.write('s\n')
                 # step in Y
                 y += step_size
                 ystepcount += 1
@@ -306,9 +333,19 @@ class brlcad_tcl():
             xstepcount += 1
         # make sure we aren't going out-of-bounds
         assert xstepcount <= num_pix_x, (xstepcount, num_pix_x)
+        nirt_script_file.close()
+        
+        # the -s command might speed things up???
+        #args = ['nirt', '-s', self.g_path, slice_region_name]
+        args = 'nirt -s {} {} < {}'.format(self.g_path, slice_region_name, nirt_script_path)
+        print('\nrunning: {}'.format(args))
 
         # pass the commands to NIRT, get NIRT's response
-        outp = p.communicate('\n'.join(lins))
+        p = subprocess.Popen(args,
+                             stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, shell=True)
+        outp = p.communicate()
 
         chunks = []
         # break up NIRT's response by newline
@@ -383,6 +420,7 @@ class brlcad_tcl():
         else:
             result = Image.fromarray((im * 255).astype(numpy.uint8))
         result.save(bmp_output_name)
+        return bmp_output_name
 
     def export_model_slices(self,
                             num_slices_desired,
@@ -608,8 +646,8 @@ class brlcad_tcl():
         self.script_string_list.append( 'oed / {0}/{1}\n'.format(combination_to_select, path_to_center))
 
     def begin_primitive_edit(self, name):
-        #self.script_string_list.append( 'Z\n')
-        #self.script_string_list.append( 'draw {}\n'.format(name))
+        self.script_string_list.append( 'Z\n')
+        self.script_string_list.append( 'draw {}\n'.format(name))
         self.script_string_list.append( 'sed {0}\n'.format(name))
 
     def end_combination_edit(self):
@@ -617,6 +655,9 @@ class brlcad_tcl():
 
     def remove_object_from_combination(self, combination, object_to_remove):
         self.script_string_list.append( 'rm {} {}\n'.format(combination, object_to_remove))
+
+    def keypoint(self, x, y, z):
+        self.script_string_list.append('keypoint {} {} {}\n'.format(x, y, z))
 
     def translate(self, x, y, z, relative=False):
         cmd = 'translate'
@@ -628,12 +669,12 @@ class brlcad_tcl():
         self.translate(dx, dy, dz, relative=True)
 
     def rotate_combination(self, x, y, z):
-        self.script_string_list.append( 'orot {} {} {}\n'.format(x, y, z))
+        self.script_string_list.append('orot {} {} {}\n'.format(x, y, z))
 
     def rotate_primitive(self, name, x, y, z, angle=None):
         is_string(name)
         self.begin_primitive_edit(name)
-        self.script_string_list.append( 'keypoint {} {} {}\n'.format(x, y, z))
+        self.keypoint(x, y, z)
         if angle:
             self.script_string_list.append( 'arot {} {} {} {}\n'.format(x, y, z, angle))
         else:
@@ -749,6 +790,9 @@ class brlcad_tcl():
         is_truple(pmax)
         minx,miny,minz = pmin
         maxx,maxy,maxz = pmax
+        assert minx<=maxx, 'minx is not less than maxx! {} {} {}'.format(name, pmin, pmax)
+        assert miny<=maxy, 'miny is not less than maxy! {} {} {}'.format(name, pmin, pmax)
+        assert minz<=maxz, 'minz is not less than maxz! {} {} {}'.format(name, pmin, pmax)
         self.script_string_list.append( 'in {} rpp {} {} {} {} {} {}\n'.format(name,
                                                                      minx,maxx,
                                                                      miny,maxy,
