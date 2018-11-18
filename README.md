@@ -2,7 +2,6 @@
 So far this is a small subset of the brl-cad primitives with some notion of object-oriented design, being emitted as tcl scripts that mged can directly process into database (.g) files. Requirements are Python and brl-cad.
 
 
-
 ## An example of a 28BYJ-48 stepper motor, run with:  
 * `# git clone this repository`
 * `cd python-brlcad-tcl`
@@ -36,3 +35,21 @@ Looking at the raster output, with greyscale output option:
 Looking at the raster output:
 
 ![Alt text](examples/output/microfluidic_pump/microfluidic_pump_bw.gif?raw=true "")
+
+# Developers section
+## Adding support to python-brlcad-tcl for new operations or shapes/primitives
+### If it is an mged command
+* find the usage syntax - <https://brlcad.org/wiki/MGED_Commands>
+* add a new method that users will use to call the new feature from their scripts
+* code the method to use string-formatting, then append it to the `self.script_string_list` object
+
+#### Conventions
+* `name = self._default_name_(name)`
+  * this will do a few things
+    * checks if the name is empty-string or `None`
+      * if so, then uses the `inspect` module to learn the caller-function name, and uses that function name as a "new name"
+    * checks if the name is in a lookup-table of already-used names
+      * if so, appends a number to the name, then adds this name to the lookup-table
+* `return name`
+  * return the name of the final object or primitive so the users can use it if they want
+ 

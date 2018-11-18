@@ -123,16 +123,15 @@ def hilbert_pipe(file_name, size=10, recursions=4, dc=0.2, direction=ZP, variant
         generate_points(recursions, direction=direction, variant=variant,
                         x_vec=Vector(x_vec)*l, y_vec=Vector(y_vec)*l, z_vec=Vector(z_vec)*l)
     ]
-    with brlcad_tcl(file_name, "Hilbert-pipe 3D", stl_quality=0.5) as brl_db:
-        pipe_name = "hilbert_3d.s"
-        brl_db.pipe(pipe_name, points)
-        region_name = "hilbert_3d.r"
-        brl_db.region(region_name, 'u {}'.format(pipe_name))
+    with brlcad_tcl(file_name, "Hilbert-pipe 3D", stl_quality=0.9) as brl_db:
+        pipe_name = brl_db.pipe(points, "hilbert_3d.s")
+        region_name = brl_db.region('u {}'.format(pipe_name),
+                                    "hilbert_3d.r")
     # process the tcl script into a g database by calling mged
     brl_db.save_g()
     # process the g database into an STL file with a list of regions
-    brl_db.save_stl([region_name])     
-        
+    brl_db.save_stl([region_name])
+
 
 def hilbert_3D():
     if len(sys.argv) >= 2:
@@ -169,9 +168,9 @@ def hilbert_3D_test():
                     region_name = "hilbert_pipe_{}{}{}{}{}.r".format(o1, o2, *crt_dir)
 
                     brl_db.pipe(shape_name, points=segments)
-                    brl_db.region(region_name, 'u {}'.format(shape_name))
-                    regions.append(region_name)
-        
+                    region = brl_db.region('u {}'.format(shape_name), region_name)
+                    regions.append(region)
+    
     # process the tcl script into a g database by calling mged
     brl_db.save_g()
     # process the g database into an STL file with a list of regions

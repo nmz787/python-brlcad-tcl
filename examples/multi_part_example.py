@@ -20,7 +20,6 @@ from examples.motor_28BYJ_48__example import motor_28BYJ_48
 class aerosol_can_snap_cap(object):
     def __init__(self, brl_db):
         #cap_height = 40
-        self.get_next_name = brl_db.name_tracker.get_next_name
         self.brl_db = brl_db
 
         self.lower_rim_inner_diamater = 61.1 # may need to change to 61.0mm
@@ -38,26 +37,26 @@ class aerosol_can_snap_cap(object):
         self.shell()
 
     def shell(self):
-        main_body_cyl = self.get_next_name(self, 'main_body_cyl.s')
         # create the outer cylinder
-        self.brl_db.rcc(main_body_cyl,
-                   base=(0, 0, 0),
-                   height=(0, 0, self.twice_sprayer_height),
-                   radius=(self.lower_rim_outer_diameter/2.0)+self.shell_thickness)
+        main_body_cyl = self.brl_db.rcc(
+                            base=(0, 0, 0),
+                            height=(0, 0, self.twice_sprayer_height),
+                            radius=((self.lower_rim_outer_diameter/2.0)+
+                                    self.shell_thickness),
+                            name='main_body_cyl.s')
 
-        inner_main_body_cyl = self.get_next_name(self, 'inner_main_body_cyl.s')
         # create the inner cylinder to be subtracted
-        self.brl_db.rcc(inner_main_body_cyl,
+        inner_main_body_cyl =self.brl_db.rcc(
                    base=(0, 0, 0),
                    height=(0, 0, self.twice_sprayer_height - self.shell_thickness),
-                   radius=(self.lower_rim_outer_diameter/2.0))
+                   radius=(self.lower_rim_outer_diameter/2.0),
+                   name='inner_main_body_cyl.s')
 
-        cap_shell = self.get_next_name(self, "cap_shell.r")
         # make a union of the subtraction of the inner from the outer
         # also make it a region (a special combination that means it's going to be rendered)
-        self.brl_db.region(cap_shell,
-                           'u {} - {}'.format(main_body_cyl,
-                                              inner_main_body_cyl)
+        cap_shell = self.brl_db.region(subtract(main_body_cyl,
+                                                inner_main_body_cyl),
+                                       "aerosol_can_snap_cap__cap_shell1.r"
         )
         self.final_name = cap_shell
         '''

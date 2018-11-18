@@ -17,7 +17,7 @@ outFileTCL = outFilePathBase + '.tcl'
 outFileSTL = outFilePathBase + '.stl'
 
 #The quality for the STL output. 0.5 is worse, 0.1 is pretty good, 0.01 makes files large but really good quality...
-stlQuality = 0.001
+stlQuality =0.001# 0.016
 
 #Some variables for creating all of the various components
 
@@ -25,39 +25,10 @@ def createPencilSharpener():
 
 	#Create the two cylinders for the bottom layer
 	#Also we're working in Inches
-	brl = brlcad_tcl(tcl_filepath = outFileTCL, title = "Pencil Sharpener Gear", make_g = False, make_stl = True, stl_quality = stlQuality, units = 'in')
-	
-	#Create our cylinders, regions, names, etc...
-	bottom 			= 'b'
-	bottomNegative 	= 'bn'
-	bottomRing		= 'br'
-	bottomFinal		= 'bf'
-	
-	middle			= 'm'
-	middleNegative 	= 'mn'
-	middleRing		= 'mr'
-	middleWithGuide	= 'mh'
-	middleFinal		= 'mf'
-	
-	middleTop			= 'mt'
-	middleTopNegative	= 'mtn'
-	middleTopRing		= 'mtr'
-	
-	top				= 't'
-	topNegative		= 'tn'
-	topRing			= 'tr'
-	topFinal		= 'tf'
-	
-	shavingsHole	= 'sh'
-	
-	leftGuide		= 'l'
-	rightGuide		= 'r'
-	
-	gearName		= 'gf'
-	toothName		= 'tooth'
-	
-	allFinal		= 'finished'
-
+	outFilePathBase = check_cmdline_args(__file__)
+	brl = brlcad_tcl(project_filename_prefix = outFilePathBase, title = "Pencil Sharpener Gear",
+					 make_g = False, stl_quality = stlQuality, units = 'in')
+	brl.stl_quality_method = 'absolute'
 	#Variables for their sizes and positions, in inches
 	bottomOuterRadius	= 0.650
 	bottomInnerRadius	= 0.460
@@ -96,6 +67,7 @@ def createPencilSharpener():
 	
 	holeCenterHeight = bottomHeight + (middleHeight/2)
 	
+	#Create our cylinders, regions, names, etc...
 	#Create the 8 points that make the box
 	holePoints	= (
 					(-holeWidth	, 0	, holeCenterHeight - holeHeight),
@@ -117,54 +89,58 @@ def createPencilSharpener():
 	#Now we start building all of our shapes
 	
 	#Start with bottom...
-	brl.rcc(bottom, bottomPosition, (0, 0, bottomHeight), bottomOuterRadius)
-	brl.rcc(bottomNegative, bottomPosition, (0, 0, bottomHeight), bottomInnerRadius)
+	bottom = brl.rcc(bottomPosition, (0, 0, bottomHeight), bottomOuterRadius, 'b')
+	bottomNegative = brl.rcc(bottomPosition, (0, 0, bottomHeight), bottomInnerRadius, 'bn')
 	
 	#Now subtract inner from outer
-	brl.region(bottomRing, subtract(bottom, bottomNegative))
+	bottomRing = brl.region(subtract(bottom, bottomNegative), 'br')
 	
 	#Now make the middle and cut it into a ring
-	brl.rcc(middle, middlePosition, (0, 0, middleHeight), middleOuterRadius)
-	brl.rcc(middleNegative, middlePosition, (0, 0, middleHeight), middleInnerRadius)
-	brl.region(middleRing, subtract(middle, middleNegative))
+	middle = brl.rcc(middlePosition, (0, 0, middleHeight), middleOuterRadius, 'm')
+ 	middleNegative=brl.rcc(middlePosition, (0, 0, middleHeight), middleInnerRadius, 'mn')
+	middleRing = brl.region(subtract(middle, middleNegative), 'mr')
 	
 	#Now turn the top into a ring
-	brl.rcc(top, topPosition, (0, 0, topHeight), topOuterRadius)
-	brl.rcc(topNegative, topPosition, (0, 0, topHeight), topInnerRadius)
-	brl.region(topRing, subtract(top, topNegative))
+	top = brl.rcc(topPosition, (0, 0, topHeight), topOuterRadius, 't')
+	topNegative = brl.rcc(topPosition, (0, 0, topHeight), topInnerRadius, 'tn')
+	topRing = brl.region(subtract(top, topNegative), 'tr')
 	
 	#Now going from top down, we'll turn the top into a top-hat
-	brl.rcc(middleTop, middleTopPosition, (0, 0, middleTopHeight), middleTopOuterRadius)
-	brl.rcc(middleTopNegative, middleTopPosition, (0, 0, middleTopHeight), middleTopInnerRadius)
-	brl.region(middleTopRing, subtract(middleTop, middleTopNegative))
+	middleTop = brl.rcc(middleTopPosition, (0, 0, middleTopHeight), middleTopOuterRadius, 'mt')
+	middleTopNegative = brl.rcc(middleTopPosition, (0, 0, middleTopHeight), middleTopInnerRadius, 'mtn')
+	middleTopRing = brl.region(subtract(middleTop, middleTopNegative), 'mtr')
 	
 	#And now add it to the top
-	brl.region(topFinal, union(topRing, middleTopRing))
+	topFinal = brl.region(union(topRing, middleTopRing), 'tf')
 	
 	#Next we will add the guides to the middle...
-	brl.rcc(leftGuide, leftGuidePosition, (0, 0, leftGuideHeight), leftGuideOuterRadius)
-	brl.rcc(rightGuide, rightGuidePosition, (0, 0, rightGuideHeight), rightGuideOuterRadius)
+	leftGuide = brl.rcc(leftGuidePosition, (0, 0, leftGuideHeight), leftGuideOuterRadius, 'l')
+	rightGuide = brl.rcc(rightGuidePosition, (0, 0, rightGuideHeight), rightGuideOuterRadius, 'r')
 	
 	#Now add them
-	brl.region(middleWithGuide, union(middleRing, leftGuide, rightGuide))
+	middleWithGuide = brl.region(union(middleRing, leftGuide, rightGuide), 'mh')
 	
 	#And now cut the hole for pencil shavings
-	brl.arb8(shavingsHole, holePoints)
-	brl.region(middleFinal, subtract(middleWithGuide, shavingsHole))
+	shavingsHole = brl.arb8(holePoints, 'sh')
+	middleFinal = brl.region(subtract(middleWithGuide, shavingsHole), 'mf')
 	
 	#Finally, we'll cut the gears out of the bottom...	
 	#Get all the content for the gears
-	gearLines, gearName = toothGen.createGears(gearName = gearName, toFile = False, toothHalfWidth = toothHalfWidth, toothDepth = toothDepth, toothHeight = toothHeight, toothBaseName = toothName)
+	gearLines, gearName = toothGen.createGears(gearName = 'gf', toFile = False,
+											   toothHalfWidth = toothHalfWidth,
+											   toothDepth = toothDepth,
+											   toothHeight = toothHeight,
+											   toothBaseName = 'tooth')
 	
 	#Now add those lines to the object...
 	linesFlat = '\n'.join(gearLines)	
 	brl.add_script_string(linesFlat)
 	
 	#Now we want to subtract the gear from the bottom
-	brl.region(bottomFinal, subtract(bottomRing, gearName))
+	bottomFinal = brl.region(subtract(bottomRing, gearName), 'bf')
 	
 	#We now have a bunch of final regions. Combine them into the final gear housing
-	brl.region(allFinal, union(bottomFinal, middleFinal, topFinal))
+	allFinal = brl.region(union(bottomFinal, middleFinal, topFinal), 'finished')
 		
 	#Now we can convert the .g into a .stl, using the final region. save_stl requires a list.
 	brl.run_and_save_stl([allFinal])

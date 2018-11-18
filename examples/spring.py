@@ -12,7 +12,7 @@ from python_brlcad_tcl.brlcad_tcl import *
         
 if __name__ == "__main__":
     g_path_out = check_cmdline_args(__file__)
-    with brlcad_tcl(g_path_out, "My Database1", stl_quality=0.5) as brl_db:
+    with brlcad_tcl(g_path_out, "My Database1") as brl_db:
 
         # create a lookup table for 4 X,Y points on the spring circumference
         spring_outline_x_y_tuples = [(-50,-50), (-50,50), (50,50), (50,-50)]
@@ -32,10 +32,10 @@ if __name__ == "__main__":
                                       outer_diameter=5,
                                       bend_radius=50)
             points.append(point)
-        brl_db.pipe('spring1.s', points)
-        brl_db.region('spring.r', 'u spring1.s')
+        spring1 = brl_db.pipe(points,'spring1.s')
+        spring = brl_db.region(union(spring1), 'spring.r')
         
     # process the tcl script into a g database by calling mged
     brl_db.save_g()
     # process the g database into an STL file with a list of regions
-    brl_db.save_stl(['spring.r'])
+    brl_db.save_stl([spring])

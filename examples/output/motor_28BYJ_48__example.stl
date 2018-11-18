@@ -1,4 +1,4 @@
-solid _28BYJ_48__COMPLETE1.g
+solid motor_28BYJ_48__COMPLETE1.r
   facet normal 0.000000 0.000000 1.000000
     outer loop
       vertex 0.877906 3.586466 20.500000
@@ -3219,4 +3219,4 @@ solid _28BYJ_48__COMPLETE1.g
       vertex 7.300000 -17.000000 0.000000
     endloop
   endfacet
-endsolid _28BYJ_48__COMPLETE1.g
+endsolid motor_28BYJ_48__COMPLETE1.r

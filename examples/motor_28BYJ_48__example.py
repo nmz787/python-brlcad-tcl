@@ -49,53 +49,48 @@ class motor_28BYJ_48():
 
         # create the part sections
         body = self.body()
-        print 'Body DONE: {}\n'.format(body)
+        print('Body DONE: {}\n'.format(body))
 
         mounting = self.mounting_wings()
-        print 'Mounting wings DONE: {}\n'.format(mounting)
+        print('Mounting wings DONE: {}\n'.format(mounting))
         shaft = self.shaft()
-        print 'Shaft DONE: {}\n'.format(shaft)
-
-        self.final_name = self.get_next_name(self, "COMPLETE.r")
+        print('Shaft DONE: {}\n'.format(shaft))
 
         # finally create a region (a special combination that means it's going to be rendered)
         # by unioning together the main combinations we just created
-        brl_db.region(self.final_name,
-                      'u {} u {} u {}'.format(body,
-                                              mounting,
-                                              shaft)
-                      )
-        print 'Motor COMPLETED AND COMBINED into part name: {}'.format(self.final_name)
+        self.final_name = brl_db.region('u {} u {} u {}'.format(body,
+                                                                mounting,
+                                                                shaft),
+                                        "motor_28BYJ_48__COMPLETE1.r")
+        print('Motor COMPLETED AND COMBINED into part name: {}'.format(self.final_name))
 
     def body(self):
 
-        main_body_cyl = self.get_next_name(self, 'main_body_cyl.s')
         # create the motor body centered at x0,y0,z0
-        self.brl_db.rcc(main_body_cyl,
-                   base=(0, 0, 0),
-                   height=(0, 0, self.depth),
-                   radius=self.diameter/2.0)
+        main_body_cyl=self.brl_db.rcc(base=(0, 0, 0),
+                                      height=(0, 0, self.depth),
+                                      radius=self.diameter/2.0,
+                                      name='main_body_cyl.s')
 
-        wire_square = self.get_next_name(self, "wire_square.s")
-        self.brl_db.rpp(wire_square,
+        wire_square = self.brl_db.rpp(
                    pmin=(self.wire_square_width/-2.0,  # x
                          self.wire_square_len_from_center,                                     # y
                          0),     # z
                    pmax=(self.wire_square_width/2.0,                       # x
                          0,   # y
-                         self.depth)                            # z
+                         self.depth),                           # z
+                   name="wire_square.s"
                    )
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
-        main_body = self.get_next_name(self, "main_body.c")
-        self.brl_db.combination(main_body,
-                                'u {} u {}'.format(wire_square,
-                                                   main_body_cyl)
+        main_body = self.brl_db.combination('u {} u {}'.format(wire_square,
+                                                               main_body_cyl),
+                                            "main_body.c"
         )
 
         # before returning, assemble the path to the center of the cylinder
         # this seems like a reasonable point of rotation/translation
-        self.center_name = main_body + '/' + main_body_cyl
+        self.center_name = '{}/{}'.format(main_body, main_body_cyl)
 
         return main_body
 
@@ -104,16 +99,17 @@ class motor_28BYJ_48():
         # Make an rpp under the sphere (partly overlapping). Note that this really
         # makes an arb8, but gives us a shortcut for specifying the parameters.
         wing_block_name = self.get_next_name(self, "mounting_wings_rect.s")
-        self.brl_db.rpp(wing_block_name,
+        self.brl_db.rpp(
                    pmin=(self.wing_hole_center_to_center/-2.0,  # x
                          self.wing_width/-2.0,                                     # y
                          self.depth - self.wing_thickness),     # z
                    pmax=(self.wing_hole_center_to_center/2.0,                       # x
                          self.wing_width/2.0,   # y
-                         self.depth)                            # z
+                         self.depth),                           # z
+                   name = wing_block_name
                    )
 
-        print 'Completed step 0 of wings, part name: {}'.format(wing_block_name)
+        print('Completed step 0 of wings, part name: {}'.format(wing_block_name))
 
         #start the screw holes at z= (depth - thickness), with height thickness
         right_hole_x = self.wing_hole_center_to_center/2.0
@@ -130,46 +126,41 @@ class motor_28BYJ_48():
                             'right_wing_hole.s':{'brldb_name':None,
                                                  'x':right_hole_x,
                                                  'r':self.screw_hole_diameter/2.0}}
-        for item_name, item in curves_and_holes.iteritems():
-            item['brldb_name'] = self.get_next_name(self, item_name)
-            self.brl_db.rcc(item['brldb_name'],
-                       base=(item['x'],
-                             0,
-                             self.depth - self.wing_thickness),
-                       height=(0,
-                               0,
-                               self.wing_thickness),
-                       radius=item['r'])
+        for item_name, item in curves_and_holes.items():
+            #self.get_next_name(self, item_name)
+            n=self.brl_db.rcc(base=(item['x'],
+                                    0,
+                                    self.depth - self.wing_thickness),
+                              height=(0,
+                                      0,
+                                      self.wing_thickness),
+                              radius=item['r'], name=item_name)
+            item['brldb_name'] = n
 
-        print 'Completed step 1 of wings.'
+        print('Completed step 1 of wings.')
         
  
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
-        wings_block_chamfered = self.get_next_name(self, "wings_chamfered.c")
-        self.brl_db.combination(wings_block_chamfered,
-                                'u {} u {} u {}'.format(curves_and_holes['left_wing_curve.s']['brldb_name'],
-                                                        curves_and_holes['right_wing_curve.s']['brldb_name'],
-                                                        wing_block_name)
-        )
-        print 'Completed step 2 of wings, part name: {}'.format(wings_block_chamfered)
+        wings_block_chamfered = self.brl_db.combination(union(curves_and_holes['left_wing_curve.s']['brldb_name'],
+                                                              curves_and_holes['right_wing_curve.s']['brldb_name'],
+                                                              wing_block_name),
+                                                        "wings_chamfered.c")
+        print('Completed step 2 of wings, part name: {}'.format(wings_block_chamfered))
 
         # now subtract the holes away
-        wings_block_left_hole_subtracted = self.get_next_name(self, "wings_left_subtracted.c")
-        self.brl_db.combination(wings_block_left_hole_subtracted,
-                           'u {} - {}'.format(wings_block_chamfered,
-                                              curves_and_holes['left_wing_hole.s']['brldb_name'])
-        )
+        wings_block_left_hole_subtracted = self.brl_db.combination(subtract(wings_block_chamfered,
+                                                                            curves_and_holes['left_wing_hole.s']['brldb_name']),
+                                                                   "wings_left_subtracted.c")
 
+        print('Completed step 3 of wings, part name: {}'.format(wings_block_left_hole_subtracted))
 
-        print 'Completed step 3 of wings, part name: {}'.format(wings_block_left_hole_subtracted)
-
-        wings_block = self.get_next_name(self, "wings_block.c")
-        self.brl_db.combination(wings_block,
+        wings_block = self.brl_db.combination(
                            'u {} - {}'.format(wings_block_left_hole_subtracted,
-                                              curves_and_holes['right_wing_hole.s']['brldb_name'])
+                                              curves_and_holes['right_wing_hole.s']['brldb_name']),
+                           "wings_block.c"
         )
-        print 'Completed step 4 of wings, part name: {}'.format(wings_block)
+        print('Completed step 4 of wings, part name: {}'.format(wings_block))
         return wings_block
 
         # Makes the two screw holes
@@ -186,72 +177,60 @@ class motor_28BYJ_48():
         """
 
     def shaft(self):    
-        shaft1 = self.get_next_name(self, 'body_to_shaft_base.s')
+        
         # create the motor body centered at x0,y0,z0
-        self.brl_db.rcc(shaft1,
-                   base=(0,
-                         self.shaft_y_offset,
-                         self.depth),
-                   height=(0,
-                           0,
-                           self.body_to_shaft_base),
-                   radius=self.shaft_base_diameter/2.0)
-        print 'Completed step 1 of shaft, part name: {}'.format(shaft1)
+        shaft1 = self.brl_db.rcc(base=(0,
+                                       self.shaft_y_offset,
+                                       self.depth),
+                                 height=(0,
+                                         0,
+                                         self.body_to_shaft_base),
+                                 radius=self.shaft_base_diameter/2.0,
+                                 name='body_to_shaft_base.s')
+        print('Completed step 1 of shaft, part name: {}'.format(shaft1))
 
-        shaft2 = self.get_next_name(self, "shaft_base.s")
-        self.brl_db.rcc(shaft2,
-                        base=(0,  # x
-                              self.shaft_y_offset,                                     # y
-                              self.depth+self.body_to_shaft_base),     # z
-                        height=(0,                       # x
-                                0,   # y
-                                self.shaft_base_to_keyway_base),                           # z
-                        radius=self.keyway_base_diameter/2.0
-                        )
-        print 'Completed step 2 of shaft, part name: {}'.format(shaft2)
+        shaft2 = self.brl_db.rcc(base=(0,                                   # x
+                                       self.shaft_y_offset,                 # y
+                                       self.depth+self.body_to_shaft_base), # z
+                                 height=(0,                                 # x
+                                         0,                                 # y
+                                         self.shaft_base_to_keyway_base),   # z
+                                 radius=self.keyway_base_diameter/2.0,
+                                 name="shaft_base.s")
+        print('Completed step 2 of shaft, part name: {}'.format(shaft2))
 
         key_start = self.depth + self.body_to_shaft_base + self.shaft_base_to_keyway_base
         key_end = key_start + self.shaft_tip_to_keyway_base
 
-        shaft3 = self.get_next_name(self, "shaft_key_cyl.s")
-        self.brl_db.rcc(shaft3,
-                        base=(0,  # x
-                              self.shaft_y_offset,                                     # y
-                              key_start),     # z
-                        height=(0,                       # x
-                                0,   # y
-                                self.shaft_tip_to_keyway_base),                           # z
-                        radius=self.keyway_base_diameter/2.0
+        shaft3 = self.brl_db.rcc(
+                        base=(0,                                # x
+                              self.shaft_y_offset,              # y
+                              key_start),                       # z
+                        height=(0,                              # x
+                                0,                              # y
+                                self.shaft_tip_to_keyway_base), # z
+                        radius=self.keyway_base_diameter/2.0,
+                        name="shaft_key_cyl.s"
                         )
-        print 'Completed step 3 of shaft, part name: {}'.format(shaft3)
+        print('Completed step 3 of shaft, part name: {}'.format(shaft3))
 
-        shaft4 = self.get_next_name(self, "shaft_key_rpp.s")
-        self.brl_db.rpp(shaft4,
-                        pmin=(self.keyway_base_diameter/-2.0,  # x
-                              self.shaft_y_offset-(self.key_width/2.0),                                     # y
-                              key_start),     # z
-                        pmax=(self.keyway_base_diameter/2.0,                       # x
-                              self.shaft_y_offset+(self.key_width/2.0),   # y
-                              key_end)                           # z
-                        )
-        print 'Completed step 4 of shaft, part name: {}'.format(shaft4)
-
-        shaft_key = self.get_next_name(self, "shaft_key.c")
-        self.brl_db.combination(shaft_key,
-                                'u {} + {}'.format(shaft3,
-                                                   shaft4
-                                                 )
-        )
-        print 'Completed step 5 of shaft, part name: {}'.format(shaft_key)
+        shaft4 = self.brl_db.rpp(pmin=(self.keyway_base_diameter/-2.0,          # x
+                                       self.shaft_y_offset-(self.key_width/2.0),# y
+                                       key_start),                              # z
+                                 pmax=(self.keyway_base_diameter/2.0,           # x
+                                       self.shaft_y_offset+(self.key_width/2.0),# y
+                                       key_end),                                # z
+                                 name="shaft_key_rpp.s"
+                                 )
+        print('Completed step 4 of shaft, part name: {}'.format(shaft4))
+        shaft_key = self.brl_db.combination(union(shaft3+shaft4),
+                                            "shaft_key.c")
+        print('Completed step 5 of shaft, part name: {}'.format(shaft_key))
 
         # Make a region that is the union of these two objects. To accomplish
         # this, we don't need anymore to create any linked list of the items ;-).
-        shaft = self.get_next_name(self, "shaft.c")
-        self.brl_db.combination(shaft,
-                                'u {} u {} u {}'.format(shaft1,
-                                                        shaft2,
-                                                        shaft_key)
-        )
+        shaft = self.brl_db.combination(union(shaft1, shaft2, shaft_key),
+                                        'shaft1.c')
         return shaft
 
     def wires(self):
