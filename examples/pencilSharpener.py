@@ -97,7 +97,7 @@ def createPencilSharpener():
 	
 	#Now make the middle and cut it into a ring
 	middle = brl.rcc(middlePosition, (0, 0, middleHeight), middleOuterRadius, 'm')
- 	middleNegative=brl.rcc(middlePosition, (0, 0, middleHeight), middleInnerRadius, 'mn')
+	middleNegative=brl.rcc(middlePosition, (0, 0, middleHeight), middleInnerRadius, 'mn')
 	middleRing = brl.region(subtract(middle, middleNegative), 'mr')
 	
 	#Now turn the top into a ring

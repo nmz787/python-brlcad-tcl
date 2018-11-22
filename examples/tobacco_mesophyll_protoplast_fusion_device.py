@@ -387,7 +387,7 @@ if __name__ == "__main__":
     print('device.negative     {}'.format(device.negative))
     print('*' * 80)
     print('device.final_name   {}'.format(device.final_name))
-    print '*' * 80
+    print('*' * 80)
     c1, c2 = brl_db.get_opposing_corners_bounding_box(brl_db.get_bounding_box_coords(device.negative))
     print('bounding box of device.negative (negative, what the photoresist would be in'\
           ' hardened form for soft-lithography):\n{}\n{}\n'.format(c1, c2))
@@ -399,5 +399,5 @@ if __name__ == "__main__":
     # saved_file_path = brl_db.export_image_from_Z(device.negative, width_in_microns*2, height_in_microns*2)
     #saved_file_path = brl_db.export_image_from_Z(device.negative, width_in_microns/8, height_in_microns/8)
     #print('saved output to: {}'.format(saved_file_path))
-    print '*' * 80
+    print('*' * 80)
     brl_db.save_stl(device.negative)

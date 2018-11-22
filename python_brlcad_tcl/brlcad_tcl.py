@@ -207,7 +207,12 @@ class brlcad_tcl():
         else:
             proc = subprocess.Popen(cmd, shell=False, stdin=subprocess.PIPE,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err = proc.communicate(''.join(self.script_string_list))
+        if sys.version_info >= (3, 0):
+            out, err = proc.communicate(str.encode(''.join(self.script_string_list)))
+            out = out.decode()
+            err = err.decode()
+        else:
+            out, err = proc.communicate(''.join(self.script_string_list))
         if proc.returncode != 0:
             print('WARNING - MGED returned an error! (output to follow)\n{}\n{}'
                   .format(out, err))
@@ -409,6 +414,8 @@ class brlcad_tcl():
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, shell=True)
         outp = p.communicate()
+        if sys.version_info >= (3, 0):
+            outp = outp.decode()
 
         chunks = []
         # break up NIRT's response by newline
@@ -604,6 +611,9 @@ class brlcad_tcl():
                                 stderr=subprocess.PIPE,
                                 shell=True)
         (stdoutdata, stderrdata) = proc.communicate()
+        if sys.version_info >= (3, 0):
+            stdoutdata = stdoutdata.decode()
+            stderrdata = stderrdata.decode()
         # print stdoutdata
         # print stderrdata
         flattened = [segment.strip().rstrip('/R') for segment in stderrdata.strip().split()]
@@ -639,12 +649,15 @@ class brlcad_tcl():
                                 shell=True)
         
         (stdoutdata, stderrdata) = proc.communicate()
+        if sys.version_info >= (3, 0):
+            stdoutdata = stdoutdata.decode()
+            stderrdata = stderrdata.decode()
         if auto_retry and 'invalid command name "make_bb"' in stderrdata:
             if self.verbose:
                 print('retrying this command (obj_name: {}), as stderr returned: {}'.format(obj_name, stderrdata))
             return self.get_bounding_box_coords(obj_name, not mged_post_7_26, auto_retry=False)
         elif self.verbose:
-            print (stdoutdata, stderrdata)
+            print(stdoutdata, stderrdata)
         subprocess.Popen('mged {} "kill temp_box"'.format(self.g_path), shell=True).communicate()
 
         bb_coords = []

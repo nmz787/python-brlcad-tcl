@@ -37,10 +37,10 @@ class diffractive(BrlCadModel):
         to_group = []
         # step along Y
         #for i in xrange(0, int(round(h*scaling)), spacing):
-        for iy in xrange(0, h+spacing, spacing):
+        for iy in range(0, h+spacing, spacing):
             # now step along X
         #    for j in xrange(0, int(round(w*scaling)), spacing):
-            for jx in xrange(0, w+spacing, spacing):
+            for jx in range(0, w+spacing, spacing):
                 #xx = (j-w/2)
                 #yy = (i-h/2)
                 xx = (jx-half_lens_width) #* diameter_to_image_scaling
@@ -126,7 +126,7 @@ if __name__ == "__main__":
                              brl_db=brl_db
                                                             )
     print('device.final_name   {}'.format(device.final_name))
-    print '*' * 80
+    print('*' * 80)
     c1, c2 = brl_db.get_opposing_corners_bounding_box(brl_db.get_bounding_box_coords(device.final_name))
     print('bounding box of device.final_name:\n{}\n{}\n'.format(c1, c2))
     
@@ -151,5 +151,5 @@ if __name__ == "__main__":
     #                                                       output_greyscale=True,
     #                                                       threading_event=None)
     print('saved output to: {}'.format(saved_file_path))
-    print '*' * 80
+    print('*' * 80)
     brl_db.save_stl(device.final_name)

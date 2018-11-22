@@ -3,7 +3,6 @@ export PATH=$PATH:/usr/brlcad/bin
 """
 import os
 import sys
-import md5
 import pkgutil
 import shutil
 import subprocess
@@ -66,9 +65,9 @@ for example,committed_output_filename  in example_list[i:]:
   if os.path.isfile(committed_output):
     # check output matches 
     with open(output_stl_filename) as f:
-      hash1=hashlib.md5(f.read()).digest()
+      hash1=hashlib.md5(str.encode(f.read())).digest()
     with open(committed_output) as f:
-      hash2=hashlib.md5(f.read()).digest()
+      hash2=hashlib.md5(str.encode(f.read())).digest()
 
     if not hash1==hash2:
       print('TEST FAILED (STLs don\'t match): {} - committed_output, test_output filesizes ({}, {}) hashes ({}, {})\npaths ({}, {})\n\n'
