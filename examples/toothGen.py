@@ -21,11 +21,11 @@ _toothHeight = 0.25 - 0.0625
 def createGears(gearName = _defaultGearName, toFile = False, toothHalfWidth = _toothHalfWidth, toothDepth = _toothDepth, toothHeight = _toothHeight, toothBaseName = _defaultToothName):
 
     make1 = "in tooth0 arb6 " + str(-toothHalfWidth) + " 0 0 " \
-    						+ str(toothHalfWidth) 	+ " 0 0 " \
-    						+ str(toothHalfWidth) 	+ " 0 " + str(toothHeight) + " " \
-    						+ str(-toothHalfWidth) + " 0 " + str(toothHeight) + " " \
-    						+ "0 " + str(toothDepth) + " 0 " \
-    						+ "0 " + str(toothDepth) + " " + str(toothHeight)
+                            + str(toothHalfWidth)   + " 0 0 " \
+                            + str(toothHalfWidth)   + " 0 " + str(toothHeight) + " " \
+                            + str(-toothHalfWidth) + " 0 " + str(toothHeight) + " " \
+                            + "0 " + str(toothDepth) + " 0 " \
+                            + "0 " + str(toothDepth) + " " + str(toothHeight)
 
     union = 'r ' + str(gearName) + ' u ' + str(toothBaseName) +'0 u '
 
@@ -39,29 +39,29 @@ def createGears(gearName = _defaultGearName, toFile = False, toothHalfWidth = _t
     lines.append(endl)
 
     for tooth in range(int(numTeethAdditional)):
-    	tName = str(toothBaseName) + str(tooth + 1)
-    	if tooth == 0:
-    		prevTooth = str(toothBaseName) + '0'
-    	else:
-    		prevTooth = toothBaseName + str(tooth)
-    		union += 'u '
+        tName = str(toothBaseName) + str(tooth + 1)
+        if tooth == 0:
+            prevTooth = str(toothBaseName) + '0'
+        else:
+            prevTooth = toothBaseName + str(tooth)
+            union += 'u '
 
-    	lines.append('cp ' + str(prevTooth) + spc + str(tName))
-    	lines.append('e ' + str(tName))
-    	lines.append('sed ' + str(tName))
-    	lines.append('keypoint 0 0 0')
-    	lines.append('rot 0 0 ' + str(degPerTooth))
-    	lines.append('accept')
-    	lines.append(endl)
+        lines.append('cp ' + str(prevTooth) + spc + str(tName))
+        lines.append('e ' + str(tName))
+        lines.append('sed ' + str(tName))
+        lines.append('keypoint 0 0 0')
+        lines.append('rot 0 0 ' + str(degPerTooth))
+        lines.append('accept')
+        lines.append(endl)
 
-    	union += tName + spc
+        union += tName + spc
 
     lines.append(union)
 
     #global outFilePath
     if toFile:
         with open(outFilePath, 'w+') as outFile:
-    	   outFile.write(endl.join(lines))
+           outFile.write(endl.join(lines))
 
     #Give the lines
     return lines, gearName
