@@ -108,7 +108,7 @@ if __name__ == "__main__":
                             'fi.s',
                             'fo.s'),
                       final_name)
-    print '*' * 80
+    print('*' * 80)
     # brl_db.export_model_slices(num_slices_desired=10,
     #                            max_slice_x=30000,
     #                            max_slice_y=30000,
@@ -130,6 +130,6 @@ if __name__ == "__main__":
                                output_format='stl',
                                output_path_format='{}_slice_{}'
                                )
-    print '*' * 80
+    print('*' * 80)
     # process the g database into an STL file with a list of regions
     brl_db.save_stl([final_name])
