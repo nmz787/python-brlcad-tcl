@@ -815,6 +815,8 @@ class brlcad_tcl():
                 primitive_extension = 'c'
             elif caller_func_name == 'region':
                 primitive_extension = 'r'
+            elif caller_func_name == 'group':
+                primitive_extension = 'g'
             nname = self.name_tracker.get_next_name(self, '{}.{}'.format(caller_func_name, primitive_extension))
             #print('_default_name_ generated: {}'.format(nname))
         else:
