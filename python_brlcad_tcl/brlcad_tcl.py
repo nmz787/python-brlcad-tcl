@@ -89,16 +89,19 @@ def intersect(*args):
 
 def join_as_str(_str, alist):
     s=[]
+    # print(f'join_as_str with {_str}')
     for item in alist:
         if isinstance(item, list):
             for i in item:
-                print('join_as_str {}'.format(i))
+                # print(f'join_as_str: {i}')
+                # s.append(str(i).replace('\n', '').strip('u '))
                 s.append(str(i).strip('u '))
-                print(s[-1])
+                # print(s[-1])
         else:
-            print('join_as_str {}'.format(item))
+            # print(f'join_as_str: {item}')
+            # s.append(str(item).replace('\n', '').strip('u '))
             s.append(str(item).strip('u '))
-            print(s[-1])
+            # print(s[-1])
     return _str.join(s)
 
 
@@ -188,17 +191,24 @@ class brlcad_tcl():
                     return exe_file
 
     def save_g(self):
+        """
+        open mged with the desired .g file, use stdin to pass in the tcl script
+        """
         # try to remove a database file of the same name if it exists
         try:
             os.remove(self.g_path)
-            print('removed {}?: {}'.format(self.g_path, os.path.isfile(self.g_path)))
+            print('removed {}, does it exist?: {}'.format(self.g_path, os.path.isfile(self.g_path)))
         except Exception as e:
             if not e.errno == 2:
                 print('WARNING: could not remove: {}\nuse different file name, or delete the file manually first!'.format(self.g_path))
                 raise (e)
         
-        cmd = 'mged {} < {}'.format(self.g_path, self.tcl_filepath)
-        cmd = [self._which('mged'), self.g_path]
+        #cmd = 'mged {} < {}'.format(self.g_path, self.tcl_filepath)
+        mged_path = self._which('mged')
+        if not mged_path:
+            print('WARNING: could not find "mged" executable in your PATH! assuming "mged" is callable directly...')
+            mged_path = 'mged'
+        cmd = [mged_path, self.g_path]
         print('running mged with command: {}'.format(cmd))
         #proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
@@ -213,6 +223,7 @@ class brlcad_tcl():
             err = err.decode()
         else:
             out, err = proc.communicate(''.join(self.script_string_list))
+        print(f'MGED returncode: {proc.returncode}, out:\n{out}\n\nerr:\n{err}')
         if proc.returncode != 0:
             print('WARNING - MGED returned an error! (output to follow)\n{}\n{}'
                   .format(out, err))
@@ -275,8 +286,12 @@ class brlcad_tcl():
         cmd = '{} {} {}'.format(cmd, self.g_path, obj_str)
 
         print('running: {}'.format(cmd))
-        proc = subprocess.Popen(cmd, shell=True)#, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        proc.communicate()
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        stdout, stderr = proc.communicate()
+        # assert returncode 0, and also that there is no stdout/err "0 triangles written"
+        assert proc.returncode == 0
+        output_text = stdout.decode() if stdout else ""
+        assert "0 triangles written" not in output_text
 
     def export_image_from_Z(self, item_name, width, height, output_path=None, azimuth=None, elevation=None):
         if output_path is None:
@@ -809,7 +824,7 @@ class brlcad_tcl():
         if (name is not None) and (not is_string(name)):
             raise Exception('name arg must be a string or None (which will cause name auto-generation), type is ({})'.format(type(name)))
         caller_func_name = inspect.stack()[1][3]
-        if name is None or name is '':
+        if name is None or name == '':
             primitive_extension = 's'
             if caller_func_name == 'combination':
                 primitive_extension = 'c'
@@ -997,7 +1012,7 @@ class brlcad_tcl():
         is_truple(vertex)
         is_number(radius)
         x, y, z = vertex
-        self.script_string_list.append( 'in {} sph {} {} {} {}'.format(name, x, y, z, radius))
+        self.script_string_list.append( 'in {} sph {} {} {} {}\n'.format(name, x, y, z, radius))
         return name
 
     def sphere(self, vertex, radius, name=None):
@@ -1012,7 +1027,7 @@ class brlcad_tcl():
         is_number(radius_2)
         x, y, z = vertex
         vx, vy, vz = normal
-        self.script_string_list.append( 'in {} tor {} {} {} {}'.format(name, x, y, z, vx, vy, vz, radius_1, radius_2))
+        self.script_string_list.append( 'in {} tor {} {} {} {} {} {} {} {}\n'.format(name, x, y, z, vx, vy, vz, radius_1, radius_2))
         return name
 
     def torus_elliptical(self, eto, vertex, normal_vector, radius, cvector, axis, name=None):
